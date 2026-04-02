@@ -126,6 +126,24 @@ class EngineTests(unittest.TestCase):
                     "default": {},
                 },
             ],
+            "subgraphs": [
+                {
+                    "name": "intensify_strategy_block",
+                    "node": {
+                        "type": "operator",
+                        "name": "apply_intensify_strategy",
+                        "operator": "apply_intensify_strategy",
+                    },
+                },
+                {
+                    "name": "diversify_strategy_block",
+                    "node": {
+                        "type": "operator",
+                        "name": "apply_diversify_strategy",
+                        "operator": "apply_diversify_strategy",
+                    },
+                },
+            ],
             "root": {
                 "type": "sequence",
                 "name": "root_sequence",
@@ -245,14 +263,14 @@ class EngineTests(unittest.TestCase):
                             },
                         },
                         "then": {
-                            "type": "operator",
-                            "name": "apply_intensify_strategy",
-                            "operator": "apply_intensify_strategy",
+                            "type": "subgraph",
+                            "name": "run_intensify_strategy_block",
+                            "ref": "intensify_strategy_block",
                         },
                         "else": {
-                            "type": "operator",
-                            "name": "apply_diversify_strategy",
-                            "operator": "apply_diversify_strategy",
+                            "type": "subgraph",
+                            "name": "run_diversify_strategy_block",
+                            "ref": "diversify_strategy_block",
                         },
                     },
                 ],
@@ -272,6 +290,19 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(result.get("heuristic_score"), 7.433)
         self.assertEqual(result.get("next_strategy")["phase"], "intensify")
         self.assertEqual(result.get_slot_definition("affinity_matrix").kind, "matrix")
+
+    def test_validator_reports_unknown_subgraph_reference(self) -> None:
+        invalid_definition = {
+            "name": "invalid_subgraph_definition",
+            "root": {
+                "type": "subgraph",
+                "name": "missing_block",
+                "ref": "does_not_exist",
+            },
+        }
+
+        issues = validate_algorithm_definition(invalid_definition, build_builtin_registry())
+        self.assertTrue(any("Unknown subgraph reference" in issue.message for issue in issues))
 
     def test_validator_reports_incompatible_slot_kind_for_operator_param(self) -> None:
         invalid_definition = {

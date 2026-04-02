@@ -53,6 +53,38 @@
       "default": {}
     }
   ],
+  "subgraphs": [
+    {
+      "name": "intensify_strategy_block",
+      "node": {
+        "type": "operator",
+        "name": "apply_intensify_strategy",
+        "operator": "apply_intensify_strategy",
+        "message": "intensive follow-up heuristic prepared",
+        "snapshot_keys": ["next_strategy"],
+        "params": {
+          "local_search_weight": 0.9,
+          "merge_bias": "very_high",
+          "output_slot": "next_strategy"
+        }
+      }
+    },
+    {
+      "name": "diversify_strategy_block",
+      "node": {
+        "type": "operator",
+        "name": "apply_diversify_strategy",
+        "operator": "apply_diversify_strategy",
+        "message": "diversification follow-up heuristic prepared",
+        "snapshot_keys": ["next_strategy"],
+        "params": {
+          "shake_strength": 0.6,
+          "restart_bias": "medium",
+          "output_slot": "next_strategy"
+        }
+      }
+    }
+  ],
   "root": {
     "type": "sequence",
     "name": "matrix_driven_metaheuristic",
@@ -201,28 +233,18 @@
           }
         },
         "then": {
-          "type": "operator",
-          "name": "apply_intensify_strategy",
-          "operator": "apply_intensify_strategy",
-          "message": "intensive follow-up heuristic prepared",
-          "snapshot_keys": ["next_strategy"],
-          "params": {
-            "local_search_weight": 0.9,
-            "merge_bias": "very_high",
-            "output_slot": "next_strategy"
-          }
+          "type": "subgraph",
+          "name": "run_intensify_strategy_block",
+          "ref": "intensify_strategy_block",
+          "message": "reusable intensify block invoked",
+          "snapshot_keys": ["next_strategy"]
         },
         "else": {
-          "type": "operator",
-          "name": "apply_diversify_strategy",
-          "operator": "apply_diversify_strategy",
-          "message": "diversification follow-up heuristic prepared",
-          "snapshot_keys": ["next_strategy"],
-          "params": {
-            "shake_strength": 0.6,
-            "restart_bias": "medium",
-            "output_slot": "next_strategy"
-          }
+          "type": "subgraph",
+          "name": "run_diversify_strategy_block",
+          "ref": "diversify_strategy_block",
+          "message": "reusable diversify block invoked",
+          "snapshot_keys": ["next_strategy"]
         }
       }
     ]

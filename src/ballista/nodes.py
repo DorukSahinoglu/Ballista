@@ -122,3 +122,18 @@ class ConditionNode(Node):
 
         if self.else_branch is not None:
             self.else_branch.execute(context)
+
+
+@dataclass
+class SubgraphNode(Node):
+    name: str
+    target: Node
+    message: str | None = None
+    snapshot_keys: list[str] | None = None
+
+    def __post_init__(self) -> None:
+        Node.__init__(self, self.name)
+
+    def execute(self, context: BallistaContext) -> None:
+        context.record(self.name, self.message, snapshot_keys=self.snapshot_keys)
+        self.target.execute(context)

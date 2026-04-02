@@ -20,6 +20,7 @@ def validate_algorithm_definition(
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     slot_schema = _collect_slot_schema(definition, issues)
+    subgraph_payloads = _collect_subgraph_payloads(definition, issues)
 
     if not isinstance(definition.get("name"), str) or not definition.get("name", "").strip():
         issues.append(ValidationIssue(path="name", message="Definition name is required"))
@@ -29,7 +30,17 @@ def validate_algorithm_definition(
         issues.append(ValidationIssue(path="root", message="Root node must be an object"))
         return issues
 
-    _validate_node(root, "root", registry, slot_schema, issues)
+    for subgraph_name, payload in subgraph_payloads.items():
+        _validate_node(
+            payload,
+            f"subgraphs.{subgraph_name}.node",
+            registry,
+            slot_schema,
+            subgraph_payloads,
+            issues,
+        )
+
+    _validate_node(root, "root", registry, slot_schema, subgraph_payloads, issues)
     return issues
 
 
@@ -86,11 +97,47 @@ def _collect_slot_schema(
     return collected
 
 
+def _collect_subgraph_payloads(
+    definition: dict[str, Any],
+    issues: list[ValidationIssue],
+) -> dict[str, dict[str, Any]]:
+    collected: dict[str, dict[str, Any]] = {}
+    raw_subgraphs = definition.get("subgraphs", [])
+
+    if raw_subgraphs is None:
+        return collected
+
+    if not isinstance(raw_subgraphs, list):
+        issues.append(ValidationIssue(path="subgraphs", message="subgraphs must be a list"))
+        return collected
+
+    for index, item in enumerate(raw_subgraphs):
+        path = f"subgraphs[{index}]"
+        if not isinstance(item, dict):
+            issues.append(ValidationIssue(path=path, message="Subgraph must be an object"))
+            continue
+
+        name = item.get("name")
+        node_payload = item.get("node")
+        if not isinstance(name, str) or not name.strip():
+            issues.append(ValidationIssue(path=f"{path}.name", message="Subgraph name is required"))
+            continue
+
+        if not isinstance(node_payload, dict):
+            issues.append(ValidationIssue(path=f"{path}.node", message="Subgraph node must be an object"))
+            continue
+
+        collected[name] = node_payload
+
+    return collected
+
+
 def _validate_node(
     payload: dict[str, Any],
     path: str,
     registry: OperatorRegistry,
     slot_schema: dict[str, dict[str, Any]],
+    subgraph_payloads: dict[str, dict[str, Any]],
     issues: list[ValidationIssue],
 ) -> None:
     node_type = payload.get("type")
@@ -123,7 +170,14 @@ def _validate_node(
                 )
                 continue
 
-            _validate_node(step, f"{path}.steps[{index}]", registry, slot_schema, issues)
+            _validate_node(
+                step,
+                f"{path}.steps[{index}]",
+                registry,
+                slot_schema,
+                subgraph_payloads,
+                issues,
+            )
         return
 
     if node_type == "loop":
@@ -131,7 +185,14 @@ def _validate_node(
         if not isinstance(body, dict):
             issues.append(ValidationIssue(path=f"{path}.body", message="Loop body must be an object"))
         else:
-            _validate_node(body, f"{path}.body", registry, slot_schema, issues)
+            _validate_node(
+                body,
+                f"{path}.body",
+                registry,
+                slot_schema,
+                subgraph_payloads,
+                issues,
+            )
 
         stop_condition = payload.get("stop_condition")
         if stop_condition is not None and not registry.has_stop_condition(cast(str, stop_condition)):
@@ -156,7 +217,14 @@ def _validate_node(
         if not isinstance(then_payload, dict):
             issues.append(ValidationIssue(path=f"{path}.then", message="Condition then branch is required"))
         else:
-            _validate_node(then_payload, f"{path}.then", registry, slot_schema, issues)
+            _validate_node(
+                then_payload,
+                f"{path}.then",
+                registry,
+                slot_schema,
+                subgraph_payloads,
+                issues,
+            )
 
         else_payload = payload.get("else")
         if else_payload is not None:
@@ -165,7 +233,26 @@ def _validate_node(
                     ValidationIssue(path=f"{path}.else", message="Condition else branch must be an object")
                 )
             else:
-                _validate_node(else_payload, f"{path}.else", registry, slot_schema, issues)
+                _validate_node(
+                    else_payload,
+                    f"{path}.else",
+                    registry,
+                    slot_schema,
+                    subgraph_payloads,
+                    issues,
+                )
+        return
+
+    if node_type == "subgraph":
+        reference = payload.get("ref")
+        if not isinstance(reference, str) or not reference.strip():
+            issues.append(ValidationIssue(path=f"{path}.ref", message="Subgraph reference is required"))
+            return
+
+        if reference not in subgraph_payloads:
+            issues.append(
+                ValidationIssue(path=f"{path}.ref", message=f"Unknown subgraph reference '{reference}'")
+            )
         return
 
     issues.append(ValidationIssue(path=f"{path}.type", message=f"Unsupported node type '{node_type}'"))

@@ -23,6 +23,7 @@ Bu repoda su an su katmanlar var:
 - ortak runtime state: `BallistaContext`
 - slot schema: bir verinin ne oldugunu ve nasil temsil edildigini anlatan metadata
 - composable node'lar: `operator`, `sequence`, `loop`, `condition`
+- reusable block mantigi: `subgraph`
 - operator registry: string isimleri gercek Python davranislarina baglayan katman
 - operator param schema: operatorlerin hangi parametreleri bekledigini anlatan katman
 - algorithm definition loader: JSON/dict tanimlarini calistirilabilir algoritmaya donusturen katman
@@ -52,7 +53,7 @@ Bu repo su an ilk uc adimi baslatmis durumda.
 src/ballista/
   engine.py       -> algoritma calistirici
   models.py       -> context, history ve slot schema modelleri
-  nodes.py        -> node tipleri: sequence, loop, operator, condition
+  nodes.py        -> node tipleri: sequence, loop, operator, condition, subgraph
   registry.py     -> operator ve stop condition registry
   definitions.py  -> JSON/dict tabanli definition parser
   expression.py   -> expression / rule evaluator
@@ -121,6 +122,7 @@ Su an desteklenen node tipleri:
 - `sequence`
 - `loop`
 - `condition`
+- `subgraph`
 
 Kisaca:
 
@@ -132,7 +134,6 @@ Kisaca:
 Bu set daha sonra buyuyebilir:
 
 - `parallel`
-- `subgraph`
 - `termination`
 - `event_hook`
 
@@ -240,6 +241,31 @@ Su an desteklenen referans kokleri:
 - `metrics`
 - `schema`
 - `iteration`
+
+## Reusable Heuristic Block / Subgraph
+
+Bu adim, buyuk algoritmalar icin cok kritik.
+
+Artik definition icinde reusable bloklar tanimlayabiliyoruz:
+
+- bir kere tanimla
+- birden fazla yerde cagir
+- condition veya sequence icinden tekrar kullan
+
+Bu ne kazandiriyor?
+
+- kopyala-yapistir node tanimlari azalir
+- buyuk heuristic akislari moduler hale gelir
+- kullanici kendi mini heuristic block'larini kurmaya yaklasir
+
+Bugun destekledigimiz model:
+
+- top-level `subgraphs` listesi
+- her subgraph icin bir `name`
+- o subgraph'in calistiracagi bir `node`
+- call site tarafinda `type: "subgraph"` ve `ref`
+
+Bu bugunku haliyle tam "fonksiyon sistemi" degil ama reusable heuristic block mantiginin ilk gercek versiyonu.
 
 ## Validation Katmani
 
@@ -392,7 +418,8 @@ Buradaki amac akademik olarak guclu bir algoritma gostermek degil; motorun ozel 
 4. matematiksel bir expression ile `heuristic_score` hesapla
 5. o skora gore `search_mode` hesapla
 6. `condition` ile intensify veya diversify branch'ine git
-7. sonraki heuristic stratejisini obje olarak yaz
+7. bunu inline yazmak yerine reusable subgraph block cagir
+8. sonraki heuristic stratejisini obje olarak yaz
 
 Bu demo, kullanicinin sadece degerleri degil veri temsilini de secebildigi yone dogru attigimiz ilk ciddi adim.
 
@@ -451,6 +478,7 @@ Su anki durum:
 - operatorler runtime parametre alabiliyor
 - `condition` node ile branching var
 - expression DSL ile kurallar veri olarak yazilabiliyor
+- reusable subgraph block'lari var
 - `astro` demo calisiyor
 - `matrix + label + branch` demo calisiyor
 - testler geciyor

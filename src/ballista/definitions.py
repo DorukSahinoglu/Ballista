@@ -9,7 +9,7 @@ from typing import Any, cast
 from .engine import Algorithm
 from .expression import evaluate_expression, resolve_reference
 from .models import BallistaContext, SlotDefinition
-from .nodes import ConditionNode, LoopNode, Node, PythonNode, SequenceNode
+from .nodes import ConditionNode, LoopNode, Node, PythonNode, SequenceNode, SubgraphNode
 from .registry import OperatorRegistry
 from .validation import assert_valid_algorithm_definition
 
@@ -35,8 +35,18 @@ def load_algorithm_definition(
         slot_schema,
         cast(dict[str, Any], definition.get("initial_slots", {})),
     )
+    subgraph_payloads = _collect_subgraph_payloads(
+        cast(list[dict[str, Any]], definition.get("subgraphs", []))
+    )
+    compiled_subgraphs: dict[str, Node] = {}
     root_payload = cast(dict[str, Any], definition["root"])
-    root_node = _parse_node(root_payload, registry)
+    root_node = _parse_node(
+        root_payload,
+        registry,
+        subgraph_payloads,
+        compiled_subgraphs,
+        stack=[],
+    )
     algorithm = Algorithm(name=name, root=root_node, description=description)
     return LoadedAlgorithm(
         algorithm=algorithm,
@@ -53,7 +63,13 @@ def load_algorithm_definition_file(
     return load_algorithm_definition(payload, registry)
 
 
-def _parse_node(payload: dict[str, Any], registry: OperatorRegistry) -> Node:
+def _parse_node(
+    payload: dict[str, Any],
+    registry: OperatorRegistry,
+    subgraph_payloads: dict[str, dict[str, Any]],
+    compiled_subgraphs: dict[str, Node],
+    stack: list[str],
+) -> Node:
     node_type = _require_string(payload, "type")
     name = _require_string(payload, "name")
 
@@ -69,14 +85,26 @@ def _parse_node(payload: dict[str, Any], registry: OperatorRegistry) -> Node:
 
     if node_type == "sequence":
         steps = [
-            _parse_node(cast(dict[str, Any], step_payload), registry)
+            _parse_node(
+                cast(dict[str, Any], step_payload),
+                registry,
+                subgraph_payloads,
+                compiled_subgraphs,
+                stack,
+            )
             for step_payload in cast(list[dict[str, Any]], payload.get("steps", []))
         ]
         return SequenceNode.from_iterable(name, steps)
 
     if node_type == "loop":
         body_payload = cast(dict[str, Any], payload["body"])
-        body_node = _parse_node(body_payload, registry)
+        body_node = _parse_node(
+            body_payload,
+            registry,
+            subgraph_payloads,
+            compiled_subgraphs,
+            stack,
+        )
         if not isinstance(body_node, SequenceNode):
             raise TypeError("Loop body must resolve to a SequenceNode")
 
@@ -93,9 +121,23 @@ def _parse_node(payload: dict[str, Any], registry: OperatorRegistry) -> Node:
         )
 
     if node_type == "condition":
-        then_node = _parse_node(cast(dict[str, Any], payload["then"]), registry)
+        then_node = _parse_node(
+            cast(dict[str, Any], payload["then"]),
+            registry,
+            subgraph_payloads,
+            compiled_subgraphs,
+            stack,
+        )
         else_payload = cast(dict[str, Any] | None, payload.get("else"))
-        else_node = None if else_payload is None else _parse_node(else_payload, registry)
+        else_node = None
+        if else_payload is not None:
+            else_node = _parse_node(
+                else_payload,
+                registry,
+                subgraph_payloads,
+                compiled_subgraphs,
+                stack,
+            )
         return ConditionNode(
             name=name,
             evaluator=_build_condition_evaluator(cast(dict[str, Any], payload["condition"])),
@@ -103,6 +145,22 @@ def _parse_node(payload: dict[str, Any], registry: OperatorRegistry) -> Node:
             else_branch=else_node,
             true_message=cast(str | None, payload.get("true_message")),
             false_message=cast(str | None, payload.get("false_message")),
+            snapshot_keys=cast(list[str] | None, payload.get("snapshot_keys")),
+        )
+
+    if node_type == "subgraph":
+        reference = _require_string(payload, "ref")
+        target = _compile_subgraph(
+            reference,
+            registry,
+            subgraph_payloads,
+            compiled_subgraphs,
+            stack,
+        )
+        return SubgraphNode(
+            name=name,
+            target=target,
+            message=cast(str | None, payload.get("message")),
             snapshot_keys=cast(list[str] | None, payload.get("snapshot_keys")),
         )
 
@@ -131,6 +189,19 @@ def _parse_slot_definitions(
         )
 
     return definitions
+
+
+def _collect_subgraph_payloads(
+    payload: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    collected: dict[str, dict[str, Any]] = {}
+    for item in payload:
+        name = _require_string(item, "name")
+        node_payload = cast(dict[str, Any], item.get("node"))
+        if not isinstance(node_payload, dict):
+            raise ValueError(f"Subgraph '{name}' must define a node object")
+        collected[name] = node_payload
+    return collected
 
 
 def _build_initial_slots(
@@ -231,3 +302,33 @@ def _require_string(payload: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Definition field '{key}' must be a non-empty string")
     return value
+
+
+def _compile_subgraph(
+    reference: str,
+    registry: OperatorRegistry,
+    subgraph_payloads: dict[str, dict[str, Any]],
+    compiled_subgraphs: dict[str, Node],
+    stack: list[str],
+) -> Node:
+    if reference in compiled_subgraphs:
+        return compiled_subgraphs[reference]
+
+    if reference in stack:
+        cycle = " -> ".join(stack + [reference])
+        raise ValueError(f"Cyclic subgraph reference detected: {cycle}")
+
+    try:
+        payload = subgraph_payloads[reference]
+    except KeyError as exc:
+        raise ValueError(f"Unknown subgraph reference '{reference}'") from exc
+
+    node = _parse_node(
+        payload,
+        registry,
+        subgraph_payloads,
+        compiled_subgraphs,
+        stack + [reference],
+    )
+    compiled_subgraphs[reference] = node
+    return node
