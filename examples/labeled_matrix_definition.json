@@ -41,6 +41,12 @@
       "default": "unknown"
     },
     {
+      "name": "heuristic_score",
+      "kind": "scalar",
+      "representation": "formula_score",
+      "default": 0
+    },
+    {
       "name": "next_strategy",
       "kind": "object",
       "representation": "execution_hint",
@@ -70,18 +76,112 @@
       },
       {
         "type": "operator",
-        "name": "decide_search_mode",
-        "operator": "decide_search_mode",
-        "message": "strategy mode selected from matrix density and labels",
-        "snapshot_keys": ["search_mode"],
+        "name": "set_heuristic_score",
+        "operator": "set_slot_value",
+        "message": "heuristic score computed from a mathematical formula",
+        "snapshot_keys": ["heuristic_score"],
         "params": {
-          "solution": {
-            "$ref": "slots.constructed_solution"
-          },
-          "critical_label": "critical",
-          "critical_threshold": 3,
-          "dense_rows_threshold": 2,
-          "output_slot": "search_mode"
+          "slot": "heuristic_score",
+          "value": {
+            "$expr": {
+              "op": "round",
+              "value": {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "ref",
+                        "path": "metrics.dense_rows"
+                      },
+                      1.35
+                    ]
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "count",
+                        "source": {
+                          "$ref": "slots.constructed_solution"
+                        },
+                        "as": "item",
+                        "where": {
+                          "op": "and",
+                          "args": [
+                            {
+                              "op": "eq",
+                              "left": {
+                                "op": "ref",
+                                "path": "vars.item.label"
+                              },
+                              "right": "critical"
+                            },
+                            {
+                              "op": "gte",
+                              "left": {
+                                "op": "ref",
+                                "path": "vars.item.connection_count"
+                              },
+                              "right": 3
+                            }
+                          ]
+                        }
+                      },
+                      2.4
+                    ]
+                  },
+                  {
+                    "op": "div",
+                    "left": {
+                      "op": "sum",
+                      "source": {
+                        "$ref": "slots.constructed_solution"
+                      },
+                      "as": "item",
+                      "value": {
+                        "op": "ref",
+                        "path": "vars.item.connection_count"
+                      }
+                    },
+                    "right": {
+                      "op": "len",
+                      "value": {
+                        "$ref": "slots.constructed_solution"
+                      }
+                    }
+                  }
+                ]
+              },
+              "digits": 3
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_search_mode",
+        "operator": "set_slot_value",
+        "message": "strategy mode derived from expression rules",
+        "snapshot_keys": ["search_mode", "heuristic_score"],
+        "params": {
+          "slot": "search_mode",
+          "value": {
+            "$expr": {
+              "op": "if",
+              "condition": {
+                "op": "gte",
+                "left": {
+                  "op": "ref",
+                  "path": "slots.heuristic_score"
+                },
+                "right": 7.0
+              },
+              "then": "intensify",
+              "else": "diversify"
+            }
+          }
         }
       },
       {
@@ -89,13 +189,16 @@
         "name": "select_strategy_branch",
         "true_message": "intensification branch selected",
         "false_message": "diversification branch selected",
-        "snapshot_keys": ["search_mode", "next_strategy"],
+        "snapshot_keys": ["search_mode", "heuristic_score", "next_strategy"],
         "condition": {
-          "operator": "equals",
-          "left": {
-            "$ref": "slots.search_mode"
-          },
-          "right": "intensify"
+          "expression": {
+            "op": "eq",
+            "left": {
+              "op": "ref",
+              "path": "slots.search_mode"
+            },
+            "right": "intensify"
+          }
         },
         "then": {
           "type": "operator",

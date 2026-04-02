@@ -1,8 +1,10 @@
 from .definitions import LoadedAlgorithm, load_algorithm_definition, load_algorithm_definition_file
 from .engine import Algorithm, AlgorithmEngine
+from .expression import evaluate_expression, resolve_reference
 from .models import BallistaContext, SlotDefinition, StepRecord
 from .nodes import ConditionNode, LoopNode, PythonNode, SequenceNode
-from .registry import OperatorRegistry
+from .registry import OperatorParamSchema, OperatorRegistry, OperatorSpec
+from .validation import ValidationIssue, assert_valid_algorithm_definition, validate_algorithm_definition
 
 __all__ = [
     "Algorithm",
@@ -11,11 +13,18 @@ __all__ = [
     "ConditionNode",
     "LoadedAlgorithm",
     "LoopNode",
+    "OperatorParamSchema",
     "OperatorRegistry",
+    "OperatorSpec",
     "PythonNode",
     "SequenceNode",
     "SlotDefinition",
     "StepRecord",
+    "ValidationIssue",
+    "assert_valid_algorithm_definition",
+    "evaluate_expression",
     "load_algorithm_definition",
     "load_algorithm_definition_file",
+    "resolve_reference",
+    "validate_algorithm_definition",
 ]

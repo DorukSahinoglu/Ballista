@@ -25,6 +25,7 @@ def main() -> None:
 
     print("")
     print(f"Search mode: {result.get('search_mode')}")
+    print(f"Heuristic score: {result.get('heuristic_score')}")
     print(f"Next strategy: {result.get('next_strategy')}")
     print(f"Dense rows: {result.metrics.get('dense_rows')}")
 

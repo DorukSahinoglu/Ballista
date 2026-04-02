@@ -9,7 +9,9 @@ from ballista import (
     PythonNode,
     SequenceNode,
     SlotDefinition,
+    assert_valid_algorithm_definition,
     load_algorithm_definition,
+    validate_algorithm_definition,
 )
 from ballista.examples import build_astro_demo, build_builtin_registry
 
@@ -99,6 +101,30 @@ class EngineTests(unittest.TestCase):
                     "representation": "tag_map",
                     "default": {"0": "entry", "1": "support", "2": "critical"},
                 },
+                {
+                    "name": "constructed_solution",
+                    "kind": "object_collection",
+                    "representation": "labeled_graph_view",
+                    "default": [],
+                },
+                {
+                    "name": "search_mode",
+                    "kind": "scalar",
+                    "representation": "strategy_label",
+                    "default": "unknown",
+                },
+                {
+                    "name": "heuristic_score",
+                    "kind": "scalar",
+                    "representation": "formula_score",
+                    "default": 0,
+                },
+                {
+                    "name": "next_strategy",
+                    "kind": "object",
+                    "representation": "execution_hint",
+                    "default": {},
+                },
             ],
             "root": {
                 "type": "sequence",
@@ -116,23 +142,107 @@ class EngineTests(unittest.TestCase):
                     },
                     {
                         "type": "operator",
-                        "name": "decide_search_mode",
-                        "operator": "decide_search_mode",
+                        "name": "set_heuristic_score",
+                        "operator": "set_slot_value",
                         "params": {
-                            "solution": {"$ref": "slots.constructed_solution"},
-                            "critical_label": "critical",
-                            "critical_threshold": 3,
-                            "dense_rows_threshold": 2,
-                            "output_slot": "search_mode",
+                            "slot": "heuristic_score",
+                            "value": {
+                                "$expr": {
+                                    "op": "round",
+                                    "value": {
+                                        "op": "add",
+                                        "args": [
+                                            {
+                                                "op": "mul",
+                                                "args": [
+                                                    {"op": "ref", "path": "metrics.dense_rows"},
+                                                    1.35,
+                                                ],
+                                            },
+                                            {
+                                                "op": "mul",
+                                                "args": [
+                                                    {
+                                                        "op": "count",
+                                                        "source": {"$ref": "slots.constructed_solution"},
+                                                        "as": "item",
+                                                        "where": {
+                                                            "op": "and",
+                                                            "args": [
+                                                                {
+                                                                    "op": "eq",
+                                                                    "left": {
+                                                                        "op": "ref",
+                                                                        "path": "vars.item.label",
+                                                                    },
+                                                                    "right": "critical",
+                                                                },
+                                                                {
+                                                                    "op": "gte",
+                                                                    "left": {
+                                                                        "op": "ref",
+                                                                        "path": "vars.item.connection_count",
+                                                                    },
+                                                                    "right": 3,
+                                                                },
+                                                            ],
+                                                        },
+                                                    },
+                                                    2.4,
+                                                ],
+                                            },
+                                            {
+                                                "op": "div",
+                                                "left": {
+                                                    "op": "sum",
+                                                    "source": {"$ref": "slots.constructed_solution"},
+                                                    "as": "item",
+                                                    "value": {
+                                                        "op": "ref",
+                                                        "path": "vars.item.connection_count",
+                                                    },
+                                                },
+                                                "right": {
+                                                    "op": "len",
+                                                    "value": {"$ref": "slots.constructed_solution"},
+                                                },
+                                            },
+                                        ],
+                                    },
+                                    "digits": 3,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_search_mode",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "search_mode",
+                            "value": {
+                                "$expr": {
+                                    "op": "if",
+                                    "condition": {
+                                        "op": "gte",
+                                        "left": {"op": "ref", "path": "slots.heuristic_score"},
+                                        "right": 7.0,
+                                    },
+                                    "then": "intensify",
+                                    "else": "diversify",
+                                }
+                            },
                         },
                     },
                     {
                         "type": "condition",
                         "name": "select_branch",
                         "condition": {
-                            "operator": "equals",
-                            "left": {"$ref": "slots.search_mode"},
-                            "right": "intensify",
+                            "expression": {
+                                "op": "eq",
+                                "left": {"op": "ref", "path": "slots.search_mode"},
+                                "right": "intensify",
+                            },
                         },
                         "then": {
                             "type": "operator",
@@ -159,8 +269,72 @@ class EngineTests(unittest.TestCase):
         self.assertIsInstance(loaded.slot_schema["affinity_matrix"], SlotDefinition)
         self.assertEqual(loaded.slot_schema["affinity_matrix"].representation, "binary")
         self.assertEqual(result.get("search_mode"), "intensify")
+        self.assertEqual(result.get("heuristic_score"), 7.433)
         self.assertEqual(result.get("next_strategy")["phase"], "intensify")
         self.assertEqual(result.get_slot_definition("affinity_matrix").kind, "matrix")
+
+    def test_validator_reports_incompatible_slot_kind_for_operator_param(self) -> None:
+        invalid_definition = {
+            "name": "invalid_matrix_flow",
+            "slot_definitions": [
+                {
+                    "name": "affinity_matrix",
+                    "kind": "mapping",
+                    "representation": "tag_map",
+                    "default": {"0": [1, 0, 1]},
+                },
+                {
+                    "name": "node_labels",
+                    "kind": "mapping",
+                    "representation": "tag_map",
+                    "default": {"0": "critical"},
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "construct_labeled_solution",
+                        "operator": "construct_labeled_solution",
+                        "params": {
+                            "matrix": {"$ref": "slots.affinity_matrix"},
+                            "labels": {"$ref": "slots.node_labels"},
+                        },
+                    }
+                ],
+            },
+        }
+
+        issues = validate_algorithm_definition(invalid_definition, build_builtin_registry())
+        self.assertTrue(any("expected one of ['matrix']" in issue.message for issue in issues))
+
+        with self.assertRaises(ValueError):
+            assert_valid_algorithm_definition(invalid_definition, build_builtin_registry())
+
+    def test_validator_reports_unknown_expression_operator(self) -> None:
+        invalid_definition = {
+            "name": "invalid_expression_definition",
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_value",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "foo",
+                            "value": {"$expr": {"op": "mystery", "left": 1, "right": 2}},
+                        },
+                    }
+                ],
+            },
+        }
+
+        issues = validate_algorithm_definition(invalid_definition, build_builtin_registry())
+        self.assertTrue(any("Unsupported expression operator" in issue.message for issue in issues))
 
 
 if __name__ == "__main__":

@@ -24,7 +24,10 @@ Bu repoda su an su katmanlar var:
 - slot schema: bir verinin ne oldugunu ve nasil temsil edildigini anlatan metadata
 - composable node'lar: `operator`, `sequence`, `loop`, `condition`
 - operator registry: string isimleri gercek Python davranislarina baglayan katman
+- operator param schema: operatorlerin hangi parametreleri bekledigini anlatan katman
 - algorithm definition loader: JSON/dict tanimlarini calistirilabilir algoritmaya donusturen katman
+- validation katmani: bozuk veya uyumsuz definition'lari erkenden yakalayan katman
+- expression / rule DSL: kurallari kod yerine veriyle yazabilen katman
 - demo operatorler ve iki demo algoritma
 
 Bu sayede artik algoritmalar sadece Python class olarak degil, veri olarak da tanimlanabiliyor.
@@ -52,6 +55,8 @@ src/ballista/
   nodes.py        -> node tipleri: sequence, loop, operator, condition
   registry.py     -> operator ve stop condition registry
   definitions.py  -> JSON/dict tabanli definition parser
+  expression.py   -> expression / rule evaluator
+  validation.py   -> definition validator
   examples.py     -> builtin operatorler ve demo algoritmalar
 examples/
   astro_definition.json
@@ -142,6 +147,15 @@ Ornek:
 
 Bu, UI ile engine arasindaki temel koprudur.
 
+Registry artik sadece handler tutmuyor. Ayni zamanda operatorlerin parametre semasini da tutuyor.
+
+Bu sayede sistem su sorulari sormaya baslayabiliyor:
+
+- bu operator hangi parametreleri bekliyor
+- hangileri zorunlu
+- bir parametre bir `matrix` slot'u mu bekliyor
+- belirli bir representation gerekiyor mu
+
 ### 4. Definition Loader
 
 `definitions.py`, JSON veya dict tanimini alip calisabilir node agacina cevirir.
@@ -227,6 +241,24 @@ Su an desteklenen referans kokleri:
 - `schema`
 - `iteration`
 
+## Validation Katmani
+
+Artik Ballista definition yuklemeden once temel dogrulama yapiyor.
+
+Bu validator su tip problemleri erken yakalamaya calisiyor:
+
+- eksik `name` veya `root`
+- bilinmeyen node tipi
+- bilinmeyen operator
+- bilinmeyen stop condition
+- eksik zorunlu operator parametresi
+- gecersiz `$ref`
+- bir operator parametresinin bekledigi slot turu ile verilen slot turunun uyusmamasi
+
+Ornek olarak `construct_labeled_solution` operatoru `matrix` turunde bir slot bekliyor. Sen ona `mapping` turunde bir slot verirsen validator bunu yukleme asamasinda hata olarak isaretler.
+
+Bu katman henuz baslangic halinde. Ama UI'ya gecmeden once cok degerli, cunku kullanicinin yaptigi tanimi daha calistirmadan once anlayip geri bildirim verebilmemizi saglar.
+
 ## Condition Node
 
 `condition` node ile artik algoritma lineer akisa mahkum degil.
@@ -254,6 +286,87 @@ Desteklenen condition operatorleri:
 
 Bu su an temel bir katman. Daha sonra expression DSL ile cok daha guclu hale gelecek.
 
+## Expression / Rule DSL
+
+Bu adim, Ballista'nin "sinirsiz ozgurluge ne kadar yaklasabilecegi" sorusunda en kritik esiklerden biri.
+
+Artik parametrelerde ve condition'larda expression kullanabiliyoruz. Bu sayede kullanici su tip kurallari veriyle ifade etmeye yaklasiyor:
+
+- "eger critical label'a sahip ve 3'ten fazla baglantisi olan en az bir eleman varsa intensify et"
+- "eger dense_rows metrikleri 2'nin ustundeyse farkli branch'e git"
+- "bir liste icinden kosula uyan kac eleman var hesapla"
+
+Su an desteklenen expression operatorleri:
+
+- `ref`
+- `if`
+- `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
+- `and`, `or`, `not`
+- `contains`, `in`
+- `add`, `sub`, `mul`, `div`, `pow`, `mod`
+- `abs`, `min`, `max`, `avg`, `round`
+- `len`
+- `get`
+- `count`
+- `sum`
+
+Expression'lar hem `$ref` kullanabiliyor hem de iterasyon icinde `vars.item` gibi gecici degiskenler kullanabiliyor.
+
+Ornek:
+
+```json
+{
+  "$expr": {
+    "op": "if",
+    "condition": {
+      "op": "gte",
+      "left": {
+        "op": "count",
+        "source": { "$ref": "slots.constructed_solution" },
+        "as": "item",
+        "where": {
+          "op": "eq",
+          "left": { "op": "ref", "path": "vars.item.label" },
+          "right": "critical"
+        }
+      },
+      "right": 1
+    },
+    "then": "intensify",
+    "else": "diversify"
+  }
+}
+```
+
+Bu su an son nokta degil ama ilk kez "Python operator yazmadan kural yazma" tarafina gercekten gecmeye basladik.
+
+### Matematiksel Formula Konusu
+
+Ballista'nin sonunda kullanici kendi matematiksel formullerini tanimlayabilecek mi?
+
+Kisa cevap: evet, ama kontrollu bir DSL icinde.
+
+Yani hedef su:
+
+- kullanici agirliklar, skorlar, cezalar, yogunluklar, threshold'lar, olasilik benzeri hesaplari yazabilsin
+- bunlari slot, metric ve gecici degiskenlerden hesaplayabilsin
+- bunu Python kodu yazmadan yapabilsin
+
+Ama hedef su degil:
+
+- kullaniciya tamamen sinirsiz ham kod calistirma yetkisi vermek
+
+Bu fark cok onemli. Cunku Ballista'nin uzun vadede guclu olmasi icin sadece esnek degil, ayni zamanda:
+
+- guvenli
+- dogrulanabilir
+- UI tarafindan duzenlenebilir
+- debug edilebilir
+
+olmasi gerekiyor.
+
+Yani "sinirsiz ozgurluk"e teorik olarak hicbir zaman tam ulasamayiz. Ama amac, kullanicinin metaheuristic tasarlama alaninda pratikte cok genis bir ozgurluk alani yasamasi.
+
 ## Demo'lar
 
 ### Astro Demo
@@ -276,11 +389,17 @@ Buradaki amac akademik olarak guclu bir algoritma gostermek degil; motorun ozel 
 1. binary bir matrix tanimla
 2. bu matrix icin label map tanimla
 3. matrix'ten labeled solution view uret
-4. matrix yogunlugu ve critical label varligina gore `search_mode` sec
-5. `condition` ile intensify veya diversify branch'ine git
-6. sonraki heuristic stratejisini obje olarak yaz
+4. matematiksel bir expression ile `heuristic_score` hesapla
+5. o skora gore `search_mode` hesapla
+6. `condition` ile intensify veya diversify branch'ine git
+7. sonraki heuristic stratejisini obje olarak yaz
 
 Bu demo, kullanicinin sadece degerleri degil veri temsilini de secebildigi yone dogru attigimiz ilk ciddi adim.
+
+Bu demo artik bir seyi daha gosteriyor:
+
+- karar mantigi Python fonksiyonuna gomulu olmak zorunda degil
+- kuralin kendisi de definition dosyasinda tasinabiliyor
 
 ## Su An Neler Eksik?
 
@@ -304,13 +423,15 @@ Yani bugun "motorun ciddi bir prototipi" var; "son kullanici uygulamasi" daha yo
 
 Buradan sonra en mantikli is sirasiyla:
 
-1. definition validation
-2. operator param schema'lari
-3. expression DSL
-4. daha zengin ref/path sistemi
-5. reusable subgraph ve operator library yapisi
+1. expression DSL
+2. daha zengin ref/path sistemi
+3. reusable subgraph ve operator library yapisi
+4. operator compatibility kurallari
+5. UI tarafina uygun daha net definition contract'i
 
-Ozellikle validation cok kritik. Cunku UI gelmeden once bile su sorulara cevap vermemiz gerekecek:
+Validation ve param schema katmani artik basladi. Bir sonraki buyuk esik expression/rule tarafi.
+
+Yine de validatori daha da guclendirmemiz gerekecek. Ozellikle su sorular icin:
 
 - bu slot bu operator icin uygun mu
 - bu branch condition'i gecerli mi
@@ -329,19 +450,20 @@ Su anki durum:
 - `slot_schema` ile veri temsili metadata'si tasinabiliyor
 - operatorler runtime parametre alabiliyor
 - `condition` node ile branching var
+- expression DSL ile kurallar veri olarak yazilabiliyor
 - `astro` demo calisiyor
 - `matrix + label + branch` demo calisiyor
 - testler geciyor
 
 Bir sonraki mantikli hedef:
 
-"Definition validation ve expression katmanini ekleyip, kullanicinin tanimladigi akisin dogrulugunu ve esnekligini artirmak."
+"Expression DSL'i genisletip daha guclu user-defined heuristic mekanizmalarina gecmek."
 
 Yani sonraki sohbette dogrudan su islere girilebilir:
 
-- definition validator
-- operator param schema modeli
-- expression DSL taslagi
+- expression DSL'de list/object transform operatorleri
+- reusable subgraph/operator composition
+- user-defined heuristic block'lari
 - UI'nin tukecegi daha net bir definition contract'i
 
 ## Ozet
@@ -354,6 +476,7 @@ Su an:
 - veri tabanli algorithm definition var
 - schema ile veri temsilini de ifade etmeye basladik
 - branching ve parametreli operator katmani var
+- expression tabanli kural yazimi basladi
 
 Henuz yok:
 

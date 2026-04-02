@@ -5,7 +5,7 @@ from typing import Any
 
 from .engine import Algorithm
 from .models import BallistaContext
-from .registry import OperatorRegistry
+from .registry import OperatorParamSchema, OperatorRegistry
 from .nodes import LoopNode, PythonNode, SequenceNode
 
 
@@ -202,17 +202,95 @@ def _apply_diversify_strategy(context: BallistaContext, params: dict[str, Any]) 
     context.set(params.get("output_slot", "next_strategy"), strategy)
 
 
+def _set_slot_value(context: BallistaContext, params: dict[str, Any]) -> None:
+    context.set(params["slot"], params.get("value"))
+
+
 def build_builtin_registry() -> OperatorRegistry:
     registry = OperatorRegistry()
-    registry.register_operator("initialize_population", _initialize_population)
-    registry.register_operator("apply_attraction", _apply_attraction)
-    registry.register_operator("merge_close_candidates", _merge_close_candidates)
-    registry.register_operator("local_search", _local_search)
+    registry.register_operator(
+        "initialize_population",
+        _initialize_population,
+        params=[
+            OperatorParamSchema(name="target"),
+            OperatorParamSchema(name="population_size"),
+        ],
+    )
+    registry.register_operator(
+        "apply_attraction",
+        _apply_attraction,
+        params=[OperatorParamSchema(name="edge_weight")],
+    )
+    registry.register_operator(
+        "merge_close_candidates",
+        _merge_close_candidates,
+        params=[OperatorParamSchema(name="merge_distance")],
+    )
+    registry.register_operator(
+        "local_search",
+        _local_search,
+        params=[OperatorParamSchema(name="local_search_step")],
+    )
     registry.register_operator("update_best", _update_best)
-    registry.register_operator("construct_labeled_solution", _construct_labeled_solution)
-    registry.register_operator("decide_search_mode", _decide_search_mode)
-    registry.register_operator("apply_intensify_strategy", _apply_intensify_strategy)
-    registry.register_operator("apply_diversify_strategy", _apply_diversify_strategy)
+    registry.register_operator(
+        "construct_labeled_solution",
+        _construct_labeled_solution,
+        params=[
+            OperatorParamSchema(
+                name="matrix",
+                required=True,
+                slot_kinds=["matrix"],
+            ),
+            OperatorParamSchema(
+                name="labels",
+                required=True,
+                slot_kinds=["mapping"],
+            ),
+            OperatorParamSchema(name="active_value"),
+            OperatorParamSchema(name="output_slot"),
+        ],
+    )
+    registry.register_operator(
+        "decide_search_mode",
+        _decide_search_mode,
+        params=[
+            OperatorParamSchema(
+                name="solution",
+                required=True,
+                slot_kinds=["object_collection"],
+            ),
+            OperatorParamSchema(name="critical_label"),
+            OperatorParamSchema(name="critical_threshold"),
+            OperatorParamSchema(name="dense_rows_threshold"),
+            OperatorParamSchema(name="output_slot"),
+        ],
+    )
+    registry.register_operator(
+        "apply_intensify_strategy",
+        _apply_intensify_strategy,
+        params=[
+            OperatorParamSchema(name="local_search_weight"),
+            OperatorParamSchema(name="merge_bias"),
+            OperatorParamSchema(name="output_slot"),
+        ],
+    )
+    registry.register_operator(
+        "apply_diversify_strategy",
+        _apply_diversify_strategy,
+        params=[
+            OperatorParamSchema(name="shake_strength"),
+            OperatorParamSchema(name="restart_bias"),
+            OperatorParamSchema(name="output_slot"),
+        ],
+    )
+    registry.register_operator(
+        "set_slot_value",
+        _set_slot_value,
+        params=[
+            OperatorParamSchema(name="slot", required=True),
+            OperatorParamSchema(name="value", required=True),
+        ],
+    )
     registry.register_stop_condition("target_score_reached", _should_stop)
     return registry
 

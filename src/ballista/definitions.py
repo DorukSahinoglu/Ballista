@@ -7,9 +7,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from .engine import Algorithm
+from .expression import evaluate_expression, resolve_reference
 from .models import BallistaContext, SlotDefinition
 from .nodes import ConditionNode, LoopNode, Node, PythonNode, SequenceNode
 from .registry import OperatorRegistry
+from .validation import assert_valid_algorithm_definition
 
 
 @dataclass(slots=True)
@@ -23,6 +25,7 @@ def load_algorithm_definition(
     definition: dict[str, Any],
     registry: OperatorRegistry,
 ) -> LoadedAlgorithm:
+    assert_valid_algorithm_definition(definition, registry)
     name = _require_string(definition, "name")
     description = cast(str, definition.get("description", ""))
     slot_schema = _parse_slot_definitions(
@@ -154,6 +157,10 @@ def _build_param_resolver(payload: Any):
 
 
 def _build_condition_evaluator(payload: dict[str, Any]):
+    if "expression" in payload:
+        expression = cast(dict[str, Any], payload["expression"])
+        return lambda context: bool(evaluate_expression(expression, context))
+
     if "all" in payload:
         evaluators = [
             _build_condition_evaluator(cast(dict[str, Any], item))
@@ -206,7 +213,10 @@ def _build_value_resolver(spec: Any):
 def _resolve_value(spec: Any, context: BallistaContext) -> Any:
     if isinstance(spec, dict):
         if "$ref" in spec:
-            return _resolve_reference(cast(str, spec["$ref"]), context)
+            return resolve_reference(cast(str, spec["$ref"]), context)
+
+        if "$expr" in spec:
+            return evaluate_expression(cast(dict[str, Any], spec["$expr"]), context)
 
         return {key: _resolve_value(value, context) for key, value in spec.items()}
 
@@ -214,36 +224,6 @@ def _resolve_value(spec: Any, context: BallistaContext) -> Any:
         return [_resolve_value(item, context) for item in spec]
 
     return deepcopy(spec)
-
-
-def _resolve_reference(reference: str, context: BallistaContext) -> Any:
-    if reference == "iteration":
-        return context.iteration
-
-    parts = reference.split(".")
-    root = parts[0]
-
-    if root == "slots":
-        value: Any = context.slots
-    elif root == "metrics":
-        value = context.metrics
-    elif root == "schema":
-        value = context.slot_schema
-    else:
-        raise ValueError(f"Unsupported reference root '{root}'")
-
-    for part in parts[1:]:
-        if isinstance(value, dict):
-            value = value[part]
-            continue
-
-        if isinstance(value, list):
-            value = value[int(part)]
-            continue
-
-        value = getattr(value, part)
-
-    return deepcopy(value)
 
 
 def _require_string(payload: dict[str, Any], key: str) -> str:
