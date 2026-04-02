@@ -1,0 +1,127 @@
+{
+  "name": "labeled_matrix_flow",
+  "description": "Matrix, labels and conditional strategy selection loaded from JSON",
+  "slot_definitions": [
+    {
+      "name": "affinity_matrix",
+      "kind": "matrix",
+      "representation": "binary",
+      "default": [
+        [1, 1, 0, 1],
+        [0, 1, 1, 0],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1]
+      ],
+      "metadata": {
+        "row_labels": ["alpha", "beta", "gamma", "delta"],
+        "semantic": "binary connectivity matrix"
+      }
+    },
+    {
+      "name": "node_labels",
+      "kind": "mapping",
+      "representation": "tag_map",
+      "default": {
+        "0": "entry",
+        "1": "support",
+        "2": "critical",
+        "3": "explorer"
+      }
+    },
+    {
+      "name": "constructed_solution",
+      "kind": "object_collection",
+      "representation": "labeled_graph_view",
+      "default": []
+    },
+    {
+      "name": "search_mode",
+      "kind": "scalar",
+      "representation": "strategy_label",
+      "default": "unknown"
+    },
+    {
+      "name": "next_strategy",
+      "kind": "object",
+      "representation": "execution_hint",
+      "default": {}
+    }
+  ],
+  "root": {
+    "type": "sequence",
+    "name": "matrix_driven_metaheuristic",
+    "steps": [
+      {
+        "type": "operator",
+        "name": "construct_labeled_solution",
+        "operator": "construct_labeled_solution",
+        "message": "binary matrix projected into a labeled solution view",
+        "snapshot_keys": ["constructed_solution"],
+        "params": {
+          "matrix": {
+            "$ref": "slots.affinity_matrix"
+          },
+          "labels": {
+            "$ref": "slots.node_labels"
+          },
+          "active_value": 1,
+          "output_slot": "constructed_solution"
+        }
+      },
+      {
+        "type": "operator",
+        "name": "decide_search_mode",
+        "operator": "decide_search_mode",
+        "message": "strategy mode selected from matrix density and labels",
+        "snapshot_keys": ["search_mode"],
+        "params": {
+          "solution": {
+            "$ref": "slots.constructed_solution"
+          },
+          "critical_label": "critical",
+          "critical_threshold": 3,
+          "dense_rows_threshold": 2,
+          "output_slot": "search_mode"
+        }
+      },
+      {
+        "type": "condition",
+        "name": "select_strategy_branch",
+        "true_message": "intensification branch selected",
+        "false_message": "diversification branch selected",
+        "snapshot_keys": ["search_mode", "next_strategy"],
+        "condition": {
+          "operator": "equals",
+          "left": {
+            "$ref": "slots.search_mode"
+          },
+          "right": "intensify"
+        },
+        "then": {
+          "type": "operator",
+          "name": "apply_intensify_strategy",
+          "operator": "apply_intensify_strategy",
+          "message": "intensive follow-up heuristic prepared",
+          "snapshot_keys": ["next_strategy"],
+          "params": {
+            "local_search_weight": 0.9,
+            "merge_bias": "very_high",
+            "output_slot": "next_strategy"
+          }
+        },
+        "else": {
+          "type": "operator",
+          "name": "apply_diversify_strategy",
+          "operator": "apply_diversify_strategy",
+          "message": "diversification follow-up heuristic prepared",
+          "snapshot_keys": ["next_strategy"],
+          "params": {
+            "shake_strength": 0.6,
+            "restart_bias": "medium",
+            "output_slot": "next_strategy"
+          }
+        }
+      }
+    ]
+  }
+}

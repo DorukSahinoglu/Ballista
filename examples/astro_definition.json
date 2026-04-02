@@ -1,0 +1,66 @@
+{
+  "name": "astro_from_definition",
+  "description": "Toy attraction-and-merge metaheuristic loaded from JSON",
+  "initial_slots": {
+    "rng_seed": 7,
+    "target": 3.5,
+    "target_score": 0.1,
+    "population_size": 10,
+    "edge_weight": 0.24,
+    "merge_distance": 0.8,
+    "local_search_step": 0.3
+  },
+  "root": {
+    "type": "sequence",
+    "name": "astro_algorithm",
+    "steps": [
+      {
+        "type": "operator",
+        "name": "initialize_population",
+        "operator": "initialize_population",
+        "message": "initial population created",
+        "snapshot_keys": ["population", "best"]
+      },
+      {
+        "type": "loop",
+        "name": "optimization_loop",
+        "max_iterations": 20,
+        "stop_condition": "target_score_reached",
+        "body": {
+          "type": "sequence",
+          "name": "astro_iteration",
+          "steps": [
+            {
+              "type": "operator",
+              "name": "apply_attraction",
+              "operator": "apply_attraction",
+              "message": "population pulled toward the strongest body",
+              "snapshot_keys": ["population"]
+            },
+            {
+              "type": "operator",
+              "name": "merge_close_candidates",
+              "operator": "merge_close_candidates",
+              "message": "nearby bodies merged into heavier candidates",
+              "snapshot_keys": ["population"]
+            },
+            {
+              "type": "operator",
+              "name": "local_search",
+              "operator": "local_search",
+              "message": "best candidate refined with local search",
+              "snapshot_keys": ["population"]
+            },
+            {
+              "type": "operator",
+              "name": "update_best",
+              "operator": "update_best",
+              "message": "best candidate updated",
+              "snapshot_keys": ["best"]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
