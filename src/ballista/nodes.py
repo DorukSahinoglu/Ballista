@@ -128,6 +128,8 @@ class ConditionNode(Node):
 class SubgraphNode(Node):
     name: str
     target: Node
+    args: dict[str, Any] = field(default_factory=dict)
+    arg_resolver: ParamResolver | None = None
     message: str | None = None
     snapshot_keys: list[str] | None = None
 
@@ -135,5 +137,13 @@ class SubgraphNode(Node):
         Node.__init__(self, self.name)
 
     def execute(self, context: BallistaContext) -> None:
-        context.record(self.name, self.message, snapshot_keys=self.snapshot_keys)
-        self.target.execute(context)
+        resolved_args = deepcopy(self.args)
+        if self.arg_resolver is not None:
+            resolved_args.update(self.arg_resolver(context))
+
+        context.push_args(resolved_args)
+        try:
+            context.record(self.name, self.message, snapshot_keys=self.snapshot_keys)
+            self.target.execute(context)
+        finally:
+            context.pop_args()

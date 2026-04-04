@@ -33,6 +33,8 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "max",
     "avg",
     "round",
+    "filter",
+    "map",
 }
 
 
@@ -88,6 +90,29 @@ def evaluate_expression(
         if isinstance(source, list):
             return deepcopy(source[int(key)])
         return deepcopy(getattr(source, key, default))
+
+    if operator in {"filter", "map"}:
+        source = _eval_operand(expression["source"], context, scope)
+        alias = expression.get("as", "item")
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError(f"Expression '{operator}' expects a non-empty alias")
+        if not isinstance(source, list):
+            raise TypeError(f"Expression '{operator}' expects a list source")
+
+        transformed = []
+        for index, item in enumerate(source):
+            nested_scope = dict(scope)
+            nested_scope[alias] = item
+            nested_scope["index"] = index
+
+            if operator == "filter":
+                if bool(_eval_operand(expression["where"], context, nested_scope)):
+                    transformed.append(deepcopy(item))
+                continue
+
+            transformed.append(_eval_operand(expression["value"], context, nested_scope))
+
+        return transformed
 
     if operator in {"count", "sum"}:
         source = _eval_operand(expression["source"], context, scope)
@@ -175,6 +200,8 @@ def resolve_reference(
         value = context.metrics
     elif root == "schema":
         value = context.slot_schema
+    elif root == "args":
+        value = context.current_args()
     elif root == "vars":
         value = dict(scope or {})
     else:

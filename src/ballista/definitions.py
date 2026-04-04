@@ -160,6 +160,7 @@ def _parse_node(
         return SubgraphNode(
             name=name,
             target=target,
+            arg_resolver=_build_param_resolver(payload.get("params", {})),
             message=cast(str | None, payload.get("message")),
             snapshot_keys=cast(list[str] | None, payload.get("snapshot_keys")),
         )

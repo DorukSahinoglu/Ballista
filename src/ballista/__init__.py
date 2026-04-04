@@ -1,3 +1,4 @@
+from .contracts import build_editor_contract, export_registry_contract, find_compatible_slots
 from .definitions import LoadedAlgorithm, load_algorithm_definition, load_algorithm_definition_file
 from .engine import Algorithm, AlgorithmEngine
 from .expression import evaluate_expression, resolve_reference
@@ -10,6 +11,7 @@ __all__ = [
     "Algorithm",
     "AlgorithmEngine",
     "BallistaContext",
+    "build_editor_contract",
     "ConditionNode",
     "LoadedAlgorithm",
     "LoopNode",
@@ -24,6 +26,8 @@ __all__ = [
     "ValidationIssue",
     "assert_valid_algorithm_definition",
     "evaluate_expression",
+    "export_registry_contract",
+    "find_compatible_slots",
     "load_algorithm_definition",
     "load_algorithm_definition_file",
     "resolve_reference",

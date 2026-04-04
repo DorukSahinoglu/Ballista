@@ -47,6 +47,12 @@
       "default": 0
     },
     {
+      "name": "priority_nodes",
+      "kind": "object_collection",
+      "representation": "priority_subset",
+      "default": []
+    },
+    {
       "name": "next_strategy",
       "kind": "object",
       "representation": "execution_hint",
@@ -55,32 +61,26 @@
   ],
   "subgraphs": [
     {
-      "name": "intensify_strategy_block",
+      "name": "strategy_block",
       "node": {
         "type": "operator",
-        "name": "apply_intensify_strategy",
-        "operator": "apply_intensify_strategy",
-        "message": "intensive follow-up heuristic prepared",
+        "name": "materialize_strategy_object",
+        "operator": "set_slot_value",
+        "message": "generic strategy block materialized the next action",
         "snapshot_keys": ["next_strategy"],
         "params": {
-          "local_search_weight": 0.9,
-          "merge_bias": "very_high",
-          "output_slot": "next_strategy"
-        }
-      }
-    },
-    {
-      "name": "diversify_strategy_block",
-      "node": {
-        "type": "operator",
-        "name": "apply_diversify_strategy",
-        "operator": "apply_diversify_strategy",
-        "message": "diversification follow-up heuristic prepared",
-        "snapshot_keys": ["next_strategy"],
-        "params": {
-          "shake_strength": 0.6,
-          "restart_bias": "medium",
-          "output_slot": "next_strategy"
+          "slot": "next_strategy",
+          "value": {
+            "phase": {
+              "$ref": "args.phase"
+            },
+            "primary_weight": {
+              "$ref": "args.primary_weight"
+            },
+            "bias": {
+              "$ref": "args.bias"
+            }
+          }
         }
       }
     }
@@ -108,10 +108,61 @@
       },
       {
         "type": "operator",
+        "name": "set_priority_nodes",
+        "operator": "set_slot_value",
+        "message": "priority subset derived with filter and map transforms",
+        "snapshot_keys": ["priority_nodes"],
+        "params": {
+          "slot": "priority_nodes",
+          "value": {
+            "$expr": {
+              "op": "map",
+              "source": {
+                "op": "filter",
+                "source": {
+                  "$ref": "slots.constructed_solution"
+                },
+                "as": "item",
+                "where": {
+                  "op": "gte",
+                  "left": {
+                    "op": "ref",
+                    "path": "vars.item.connection_count"
+                  },
+                  "right": 2
+                }
+              },
+              "as": "item",
+              "value": {
+                "node_id": {
+                  "op": "ref",
+                  "path": "vars.item.node_id"
+                },
+                "label": {
+                  "op": "ref",
+                  "path": "vars.item.label"
+                },
+                "strength": {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "ref",
+                      "path": "vars.item.connection_count"
+                    },
+                    1.1
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
         "name": "set_heuristic_score",
         "operator": "set_slot_value",
         "message": "heuristic score computed from a mathematical formula",
-        "snapshot_keys": ["heuristic_score"],
+        "snapshot_keys": ["heuristic_score", "priority_nodes"],
         "params": {
           "slot": "heuristic_score",
           "value": {
@@ -136,53 +187,54 @@
                       {
                         "op": "count",
                         "source": {
-                          "$ref": "slots.constructed_solution"
+                          "$ref": "slots.priority_nodes"
                         },
                         "as": "item",
                         "where": {
-                          "op": "and",
-                          "args": [
-                            {
-                              "op": "eq",
-                              "left": {
-                                "op": "ref",
-                                "path": "vars.item.label"
-                              },
-                              "right": "critical"
-                            },
-                            {
-                              "op": "gte",
-                              "left": {
-                                "op": "ref",
-                                "path": "vars.item.connection_count"
-                              },
-                              "right": 3
-                            }
-                          ]
+                          "op": "eq",
+                          "left": {
+                            "op": "ref",
+                            "path": "vars.item.label"
+                          },
+                          "right": "critical"
                         }
                       },
                       2.4
                     ]
                   },
                   {
-                    "op": "div",
-                    "left": {
-                      "op": "sum",
-                      "source": {
-                        "$ref": "slots.constructed_solution"
+                    "op": "if",
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "len",
+                        "value": {
+                          "$ref": "slots.priority_nodes"
+                        }
                       },
-                      "as": "item",
-                      "value": {
-                        "op": "ref",
-                        "path": "vars.item.connection_count"
+                      "right": 0
+                    },
+                    "then": {
+                      "op": "div",
+                      "left": {
+                        "op": "sum",
+                        "source": {
+                          "$ref": "slots.priority_nodes"
+                        },
+                        "as": "item",
+                        "value": {
+                          "op": "ref",
+                          "path": "vars.item.strength"
+                        }
+                      },
+                      "right": {
+                        "op": "len",
+                        "value": {
+                          "$ref": "slots.priority_nodes"
+                        }
                       }
                     },
-                    "right": {
-                      "op": "len",
-                      "value": {
-                        "$ref": "slots.constructed_solution"
-                      }
-                    }
+                    "else": 0
                   }
                 ]
               },
@@ -234,17 +286,27 @@
         },
         "then": {
           "type": "subgraph",
-          "name": "run_intensify_strategy_block",
-          "ref": "intensify_strategy_block",
-          "message": "reusable intensify block invoked",
-          "snapshot_keys": ["next_strategy"]
+          "name": "run_strategy_block_for_intensify",
+          "ref": "strategy_block",
+          "message": "generic strategy block invoked with intensify parameters",
+          "snapshot_keys": ["next_strategy"],
+          "params": {
+            "phase": "intensify",
+            "primary_weight": 0.9,
+            "bias": "very_high"
+          }
         },
         "else": {
           "type": "subgraph",
-          "name": "run_diversify_strategy_block",
-          "ref": "diversify_strategy_block",
-          "message": "reusable diversify block invoked",
-          "snapshot_keys": ["next_strategy"]
+          "name": "run_strategy_block_for_diversify",
+          "ref": "strategy_block",
+          "message": "generic strategy block invoked with diversify parameters",
+          "snapshot_keys": ["next_strategy"],
+          "params": {
+            "phase": "diversify",
+            "primary_weight": 0.6,
+            "bias": "medium"
+          }
         }
       }
     ]

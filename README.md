@@ -26,6 +26,7 @@ Bu repoda su an su katmanlar var:
 - reusable block mantigi: `subgraph`
 - operator registry: string isimleri gercek Python davranislarina baglayan katman
 - operator param schema: operatorlerin hangi parametreleri bekledigini anlatan katman
+- editor contract / compatibility katmani: UI'nin okuyabilecegi operator-uyumluluk yuzeyi
 - algorithm definition loader: JSON/dict tanimlarini calistirilabilir algoritmaya donusturen katman
 - validation katmani: bozuk veya uyumsuz definition'lari erkenden yakalayan katman
 - expression / rule DSL: kurallari kod yerine veriyle yazabilen katman
@@ -57,6 +58,7 @@ src/ballista/
   registry.py     -> operator ve stop condition registry
   definitions.py  -> JSON/dict tabanli definition parser
   expression.py   -> expression / rule evaluator
+  contracts.py    -> editor contract ve compatibility ciktilari
   validation.py   -> definition validator
   examples.py     -> builtin operatorler ve demo algoritmalar
 examples/
@@ -97,6 +99,13 @@ Testler:
 ```powershell
 $env:PYTHONPATH="src"
 python -m unittest discover -s tests
+```
+
+Contract introspection demosu:
+
+```powershell
+$env:PYTHONPATH="src"
+python examples/run_contract_demo.py
 ```
 
 ## Mimari Ozeti
@@ -156,6 +165,32 @@ Bu sayede sistem su sorulari sormaya baslayabiliyor:
 - hangileri zorunlu
 - bir parametre bir `matrix` slot'u mu bekliyor
 - belirli bir representation gerekiyor mu
+
+## Editor Contract / Compatibility
+
+Bu yeni katmanin amaci su:
+
+- UI bir operator listesini makineden okuyabilsin
+- her operatorun hangi parametreleri bekledigini gorebilsin
+- mevcut slot schema'ya gore hangi slot'larin uyumlu oldugunu cikarabilsin
+
+Yani artik Ballista sadece "engine" degil, ayni zamanda editor tarafina bilgi veren bir contract da uretiyor.
+
+Bu contract icinde sunlar var:
+
+- desteklenen node tipleri
+- desteklenen reference root'lari
+- desteklenen expression operatorleri
+- operator listesi
+- operator param semalari
+- mevcut slot schema'ya gore compatibility bilgisi
+
+Ornek bir UI sorusu artik makineden cevap alabilir:
+
+- `construct_labeled_solution` operatorunun `matrix` parametresi icin hangi slot'lar uygun?
+- `decide_search_mode` operatorunun `solution` parametresi icin hangi slot'lar uygun?
+
+Bu katman ileride surukle-birak editor icin cok degerli olacak. Cunku kullaniciya her seyi gostermek yerine yalnizca mantikli secenekleri gosterebiliriz.
 
 ### 4. Definition Loader
 
@@ -264,8 +299,17 @@ Bugun destekledigimiz model:
 - her subgraph icin bir `name`
 - o subgraph'in calistiracagi bir `node`
 - call site tarafinda `type: "subgraph"` ve `ref`
+- call site tarafinda opsiyonel `params`
+- subgraph icinde `args.something` ile bu parametrelere erisim
 
 Bu bugunku haliyle tam "fonksiyon sistemi" degil ama reusable heuristic block mantiginin ilk gercek versiyonu.
+
+Bir anlamda sunu yapabiliyoruz:
+
+- generic bir heuristic block tanimla
+- sonra bunu farkli agirliklar, bias degerleri veya strateji etiketleriyle yeniden cagir
+
+Bu, kullanicinin kendi mini heuristic fonksiyonlarini kurmasina dogru net bir adim.
 
 ## Validation Katmani
 
@@ -333,10 +377,20 @@ Su an desteklenen expression operatorleri:
 - `abs`, `min`, `max`, `avg`, `round`
 - `len`
 - `get`
+- `filter`
+- `map`
 - `count`
 - `sum`
 
 Expression'lar hem `$ref` kullanabiliyor hem de iterasyon icinde `vars.item` gibi gecici degiskenler kullanabiliyor.
+
+Bu artik sadece "hesap" degil, veri donusumu de demek. Yani kullanici:
+
+- bir listeyi filtreleyebilir
+- o listenin ustunden yeni bir obje listesi uretebilir
+- ara heuristic gorunumleri olusturabilir
+
+Bu, metaheuristic tasarimi icin cok degerli. Cunku cozum surecinde ana veriyi oldugu gibi kullanmak yerine, ondan ara "working set" veya "priority subset" gibi yapilar turetmek sik ihtiyac olur.
 
 Ornek:
 
@@ -415,11 +469,12 @@ Buradaki amac akademik olarak guclu bir algoritma gostermek degil; motorun ozel 
 1. binary bir matrix tanimla
 2. bu matrix icin label map tanimla
 3. matrix'ten labeled solution view uret
-4. matematiksel bir expression ile `heuristic_score` hesapla
-5. o skora gore `search_mode` hesapla
-6. `condition` ile intensify veya diversify branch'ine git
-7. bunu inline yazmak yerine reusable subgraph block cagir
-8. sonraki heuristic stratejisini obje olarak yaz
+4. `filter` + `map` ile `priority_nodes` ara gorunumu uret
+5. matematiksel bir expression ile `heuristic_score` hesapla
+6. o skora gore `search_mode` hesapla
+7. `condition` ile intensify veya diversify branch'ine git
+8. bunu inline yazmak yerine reusable subgraph block cagir
+9. sonraki heuristic stratejisini obje olarak yaz
 
 Bu demo, kullanicinin sadece degerleri degil veri temsilini de secebildigi yone dogru attigimiz ilk ciddi adim.
 
@@ -478,7 +533,9 @@ Su anki durum:
 - operatorler runtime parametre alabiliyor
 - `condition` node ile branching var
 - expression DSL ile kurallar veri olarak yazilabiliyor
-- reusable subgraph block'lari var
+- parametre alabilen reusable subgraph block'lari var
+- UI'nin okuyabilecegi editor contract / compatibility ciktilari var
+- list/object transform yapabilen expression operatorleri var
 - `astro` demo calisiyor
 - `matrix + label + branch` demo calisiyor
 - testler geciyor

@@ -30,6 +30,7 @@ class BallistaContext:
 
     slots: dict[str, Any] = field(default_factory=dict)
     slot_schema: dict[str, SlotDefinition] = field(default_factory=dict)
+    argument_stack: list[dict[str, Any]] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
     history: list[StepRecord] = field(default_factory=list)
     iteration: int = 0
@@ -43,6 +44,17 @@ class BallistaContext:
 
     def get_slot_definition(self, key: str) -> SlotDefinition | None:
         return self.slot_schema.get(key)
+
+    def push_args(self, args: dict[str, Any]) -> None:
+        self.argument_stack.append(args)
+
+    def pop_args(self) -> dict[str, Any]:
+        return self.argument_stack.pop()
+
+    def current_args(self) -> dict[str, Any]:
+        if not self.argument_stack:
+            return {}
+        return self.argument_stack[-1]
 
     def update_metric(self, key: str, value: Any) -> None:
         self.metrics[key] = value

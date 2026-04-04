@@ -10,6 +10,9 @@ from ballista import (
     SequenceNode,
     SlotDefinition,
     assert_valid_algorithm_definition,
+    build_editor_contract,
+    export_registry_contract,
+    find_compatible_slots,
     load_algorithm_definition,
     validate_algorithm_definition,
 )
@@ -120,6 +123,12 @@ class EngineTests(unittest.TestCase):
                     "default": 0,
                 },
                 {
+                    "name": "priority_nodes",
+                    "kind": "object_collection",
+                    "representation": "priority_subset",
+                    "default": [],
+                },
+                {
                     "name": "next_strategy",
                     "kind": "object",
                     "representation": "execution_hint",
@@ -128,19 +137,19 @@ class EngineTests(unittest.TestCase):
             ],
             "subgraphs": [
                 {
-                    "name": "intensify_strategy_block",
+                    "name": "strategy_block",
                     "node": {
                         "type": "operator",
-                        "name": "apply_intensify_strategy",
-                        "operator": "apply_intensify_strategy",
-                    },
-                },
-                {
-                    "name": "diversify_strategy_block",
-                    "node": {
-                        "type": "operator",
-                        "name": "apply_diversify_strategy",
-                        "operator": "apply_diversify_strategy",
+                        "name": "materialize_strategy_object",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "next_strategy",
+                            "value": {
+                                "phase": {"$ref": "args.phase"},
+                                "primary_weight": {"$ref": "args.primary_weight"},
+                                "bias": {"$ref": "args.bias"},
+                            },
+                        },
                     },
                 },
             ],
@@ -156,6 +165,53 @@ class EngineTests(unittest.TestCase):
                             "matrix": {"$ref": "slots.affinity_matrix"},
                             "labels": {"$ref": "slots.node_labels"},
                             "output_slot": "constructed_solution",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_priority_nodes",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "priority_nodes",
+                            "value": {
+                                "$expr": {
+                                    "op": "map",
+                                    "source": {
+                                        "op": "filter",
+                                        "source": {"$ref": "slots.constructed_solution"},
+                                        "as": "item",
+                                        "where": {
+                                            "op": "gte",
+                                            "left": {
+                                                "op": "ref",
+                                                "path": "vars.item.connection_count",
+                                            },
+                                            "right": 2,
+                                        },
+                                    },
+                                    "as": "item",
+                                    "value": {
+                                        "node_id": {
+                                            "op": "ref",
+                                            "path": "vars.item.node_id",
+                                        },
+                                        "label": {
+                                            "op": "ref",
+                                            "path": "vars.item.label",
+                                        },
+                                        "strength": {
+                                            "op": "mul",
+                                            "args": [
+                                                {
+                                                    "op": "ref",
+                                                    "path": "vars.item.connection_count",
+                                                },
+                                                1.1,
+                                            ],
+                                        },
+                                    },
+                                }
+                            },
                         },
                     },
                     {
@@ -182,48 +238,47 @@ class EngineTests(unittest.TestCase):
                                                 "args": [
                                                     {
                                                         "op": "count",
-                                                        "source": {"$ref": "slots.constructed_solution"},
+                                                        "source": {"$ref": "slots.priority_nodes"},
                                                         "as": "item",
                                                         "where": {
-                                                            "op": "and",
-                                                            "args": [
-                                                                {
-                                                                    "op": "eq",
-                                                                    "left": {
-                                                                        "op": "ref",
-                                                                        "path": "vars.item.label",
-                                                                    },
-                                                                    "right": "critical",
-                                                                },
-                                                                {
-                                                                    "op": "gte",
-                                                                    "left": {
-                                                                        "op": "ref",
-                                                                        "path": "vars.item.connection_count",
-                                                                    },
-                                                                    "right": 3,
-                                                                },
-                                                            ],
+                                                            "op": "eq",
+                                                            "left": {
+                                                                "op": "ref",
+                                                                "path": "vars.item.label",
+                                                            },
+                                                            "right": "critical",
                                                         },
                                                     },
                                                     2.4,
                                                 ],
                                             },
                                             {
-                                                "op": "div",
-                                                "left": {
-                                                    "op": "sum",
-                                                    "source": {"$ref": "slots.constructed_solution"},
-                                                    "as": "item",
-                                                    "value": {
-                                                        "op": "ref",
-                                                        "path": "vars.item.connection_count",
+                                                "op": "if",
+                                                "condition": {
+                                                    "op": "gt",
+                                                    "left": {
+                                                        "op": "len",
+                                                        "value": {"$ref": "slots.priority_nodes"},
+                                                    },
+                                                    "right": 0,
+                                                },
+                                                "then": {
+                                                    "op": "div",
+                                                    "left": {
+                                                        "op": "sum",
+                                                        "source": {"$ref": "slots.priority_nodes"},
+                                                        "as": "item",
+                                                        "value": {
+                                                            "op": "ref",
+                                                            "path": "vars.item.strength",
+                                                        },
+                                                    },
+                                                    "right": {
+                                                        "op": "len",
+                                                        "value": {"$ref": "slots.priority_nodes"},
                                                     },
                                                 },
-                                                "right": {
-                                                    "op": "len",
-                                                    "value": {"$ref": "slots.constructed_solution"},
-                                                },
+                                                "else": 0,
                                             },
                                         ],
                                     },
@@ -264,13 +319,23 @@ class EngineTests(unittest.TestCase):
                         },
                         "then": {
                             "type": "subgraph",
-                            "name": "run_intensify_strategy_block",
-                            "ref": "intensify_strategy_block",
+                            "name": "run_strategy_block_for_intensify",
+                            "ref": "strategy_block",
+                            "params": {
+                                "phase": "intensify",
+                                "primary_weight": 0.9,
+                                "bias": "very_high",
+                            },
                         },
                         "else": {
                             "type": "subgraph",
-                            "name": "run_diversify_strategy_block",
-                            "ref": "diversify_strategy_block",
+                            "name": "run_strategy_block_for_diversify",
+                            "ref": "strategy_block",
+                            "params": {
+                                "phase": "diversify",
+                                "primary_weight": 0.6,
+                                "bias": "medium",
+                            },
                         },
                     },
                 ],
@@ -287,8 +352,11 @@ class EngineTests(unittest.TestCase):
         self.assertIsInstance(loaded.slot_schema["affinity_matrix"], SlotDefinition)
         self.assertEqual(loaded.slot_schema["affinity_matrix"].representation, "binary")
         self.assertEqual(result.get("search_mode"), "intensify")
-        self.assertEqual(result.get("heuristic_score"), 7.433)
+        self.assertEqual(result.get("heuristic_score"), 8.4)
+        self.assertEqual(len(result.get("priority_nodes")), 2)
+        self.assertEqual(result.get("priority_nodes")[1]["label"], "critical")
         self.assertEqual(result.get("next_strategy")["phase"], "intensify")
+        self.assertEqual(result.get("next_strategy")["primary_weight"], 0.9)
         self.assertEqual(result.get_slot_definition("affinity_matrix").kind, "matrix")
 
     def test_validator_reports_unknown_subgraph_reference(self) -> None:
@@ -366,6 +434,61 @@ class EngineTests(unittest.TestCase):
 
         issues = validate_algorithm_definition(invalid_definition, build_builtin_registry())
         self.assertTrue(any("Unsupported expression operator" in issue.message for issue in issues))
+
+    def test_editor_contract_lists_compatible_slots_for_operator(self) -> None:
+        definition = {
+            "name": "contract_definition",
+            "slot_definitions": [
+                {
+                    "name": "affinity_matrix",
+                    "kind": "matrix",
+                    "representation": "binary",
+                },
+                {
+                    "name": "node_labels",
+                    "kind": "mapping",
+                    "representation": "tag_map",
+                },
+                {
+                    "name": "constructed_solution",
+                    "kind": "object_collection",
+                    "representation": "labeled_graph_view",
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [],
+            },
+        }
+
+        registry = build_builtin_registry()
+        loaded = load_algorithm_definition(definition, registry)
+        contract = build_editor_contract(registry, loaded.slot_schema)
+
+        compatible_slots = contract["compatibility"]["construct_labeled_solution"]["matrix"][
+            "compatible_slots"
+        ]
+        self.assertEqual(compatible_slots[0]["name"], "affinity_matrix")
+        self.assertEqual(contract["supported_node_types"], ["operator", "sequence", "loop", "condition", "subgraph"])
+
+    def test_find_compatible_slots_filters_by_kind(self) -> None:
+        registry = build_builtin_registry()
+        operator_spec = registry.get_operator_spec("construct_labeled_solution")
+        matrix_param = operator_spec.params["matrix"]
+        slot_schema = {
+            "affinity_matrix": SlotDefinition(name="affinity_matrix", kind="matrix", representation="binary"),
+            "node_labels": SlotDefinition(name="node_labels", kind="mapping", representation="tag_map"),
+        }
+
+        compatible = find_compatible_slots(matrix_param, slot_schema)
+        self.assertEqual([item.name for item in compatible], ["affinity_matrix"])
+
+    def test_export_registry_contract_contains_operator_schema(self) -> None:
+        contract = export_registry_contract(build_builtin_registry())
+        operator_names = [item["name"] for item in contract["operators"]]
+        self.assertIn("construct_labeled_solution", operator_names)
+        self.assertIn("supported_expression_operators", contract)
 
 
 if __name__ == "__main__":

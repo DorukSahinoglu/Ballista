@@ -253,6 +253,12 @@ def _validate_node(
             issues.append(
                 ValidationIssue(path=f"{path}.ref", message=f"Unknown subgraph reference '{reference}'")
             )
+        params = payload.get("params", {})
+        if not isinstance(params, dict):
+            issues.append(ValidationIssue(path=f"{path}.params", message="Subgraph params must be an object"))
+            return
+        for param_name, value in params.items():
+            _validate_value(value, f"{path}.params.{param_name}", slot_schema, issues)
         return
 
     issues.append(ValidationIssue(path=f"{path}.type", message=f"Unsupported node type '{node_type}'"))
@@ -425,7 +431,7 @@ def _validate_reference(
 
     parts = reference.split(".")
     root = parts[0]
-    if root not in {"slots", "metrics", "schema", "vars"}:
+    if root not in {"slots", "metrics", "schema", "vars", "args"}:
         issues.append(
             ValidationIssue(path=path, message=f"Unsupported reference root '{root}'")
         )
@@ -547,6 +553,28 @@ def _validate_expression(
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         if "default" in expression:
             _validate_expression_operand(expression["default"], f"{path}.default", slot_schema, issues)
+        return
+
+    if operator in {"filter", "map"}:
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message=f"Expression {operator} requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        alias = expression.get("as")
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            issues.append(ValidationIssue(path=f"{path}.as", message="Expression alias must be a string"))
+
+        required_key = "where" if operator == "filter" else "value"
+        if required_key not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.{required_key}",
+                    message=f"Expression {operator} requires '{required_key}'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression[required_key], f"{path}.{required_key}", slot_schema, issues)
         return
 
     if operator in {"count", "sum"}:
