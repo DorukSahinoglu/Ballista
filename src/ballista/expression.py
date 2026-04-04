@@ -35,6 +35,10 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "round",
     "filter",
     "map",
+    "sort_by",
+    "group_by",
+    "reduce",
+    "sliding_window",
 }
 
 
@@ -113,6 +117,93 @@ def evaluate_expression(
             transformed.append(_eval_operand(expression["value"], context, nested_scope))
 
         return transformed
+
+    if operator == "sort_by":
+        source = _eval_operand(expression["source"], context, scope)
+        alias = expression.get("as", "item")
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError("Expression 'sort_by' expects a non-empty alias")
+        if not isinstance(source, list):
+            raise TypeError("Expression 'sort_by' expects a list source")
+
+        keyed_items: list[tuple[Any, Any]] = []
+        for index, item in enumerate(source):
+            nested_scope = dict(scope)
+            nested_scope[alias] = item
+            nested_scope["index"] = index
+            sort_key = _eval_operand(expression["key"], context, nested_scope)
+            keyed_items.append((sort_key, deepcopy(item)))
+
+        descending = bool(_eval_operand(expression.get("descending", False), context, scope))
+        keyed_items.sort(key=lambda pair: pair[0], reverse=descending)
+        return [item for _, item in keyed_items]
+
+    if operator == "group_by":
+        source = _eval_operand(expression["source"], context, scope)
+        alias = expression.get("as", "item")
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError("Expression 'group_by' expects a non-empty alias")
+        if not isinstance(source, list):
+            raise TypeError("Expression 'group_by' expects a list source")
+
+        groups: dict[str, list[Any]] = {}
+        for index, item in enumerate(source):
+            nested_scope = dict(scope)
+            nested_scope[alias] = item
+            nested_scope["index"] = index
+            key = str(_eval_operand(expression["key"], context, nested_scope))
+            value_spec = expression.get("value")
+            value = deepcopy(item) if value_spec is None else _eval_operand(value_spec, context, nested_scope)
+            groups.setdefault(key, []).append(value)
+        return groups
+
+    if operator == "sliding_window":
+        source = _eval_operand(expression["source"], context, scope)
+        alias = expression.get("as", "window")
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError("Expression 'sliding_window' expects a non-empty alias")
+        if not isinstance(source, list):
+            raise TypeError("Expression 'sliding_window' expects a list source")
+
+        size = int(_eval_operand(expression["size"], context, scope))
+        if size <= 0:
+            raise ValueError("Expression 'sliding_window' expects size > 0")
+
+        windows = []
+        if len(source) < size:
+            return windows
+
+        value_spec = expression.get("value")
+        for index in range(len(source) - size + 1):
+            window = deepcopy(source[index : index + size])
+            nested_scope = dict(scope)
+            nested_scope[alias] = window
+            nested_scope["index"] = index
+            value = window if value_spec is None else _eval_operand(value_spec, context, nested_scope)
+            windows.append(value)
+        return windows
+
+    if operator == "reduce":
+        source = _eval_operand(expression["source"], context, scope)
+        item_alias = expression.get("as", "item")
+        accumulator_alias = expression.get("accumulator_as", "acc")
+        if not isinstance(item_alias, str) or not item_alias.strip():
+            raise ValueError("Expression 'reduce' expects a non-empty item alias")
+        if not isinstance(accumulator_alias, str) or not accumulator_alias.strip():
+            raise ValueError("Expression 'reduce' expects a non-empty accumulator alias")
+        if not isinstance(source, list):
+            raise TypeError("Expression 'reduce' expects a list source")
+
+        accumulator = _eval_operand(expression["initial"], context, scope)
+        value_spec = expression["value"]
+
+        for index, item in enumerate(source):
+            nested_scope = dict(scope)
+            nested_scope[item_alias] = item
+            nested_scope[accumulator_alias] = accumulator
+            nested_scope["index"] = index
+            accumulator = _eval_operand(value_spec, context, nested_scope)
+        return accumulator
 
     if operator in {"count", "sum"}:
         source = _eval_operand(expression["source"], context, scope)

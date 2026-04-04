@@ -2,111 +2,100 @@
 
 Ballista, kullanicilarin kod yazmadan kendi metaheuristic algoritmalarini kurabilmesi icin tasarlanan uygulama fikrinin Python cekirdegi.
 
-Bu repo su an bir UI urunu degil. Buradaki amac, gelecekteki gorsel uygulamanin altinda calisacak motoru, veri modelini ve algorithm definition katmanini dogru kurmak.
+Bu repo su an son kullaniciya acik bir UI urunu degil. Buradaki ana hedef, gelecekteki gorsel editorun altinda calisacak motoru, tanim dilini ve veri modelini saglam sekilde kurmak.
 
-## Cekirdek Fikir
+Bu README bilerek detayli tutuluyor. Amac sadece repo aciklamasi yazmak degil; token biterse veya yeni bir sohbete gecilirse projeyi hizli sekilde kaldigi yerden devam ettirebilecek bir teknik hafiza olusturmak.
 
-Ballista'nin hedefi su:
+## Vizyon
 
-- kullanici kendi metaheuristic fikrini ifade etsin
-- population, matrix, binary structure, label map, custom object gibi veri temsillerini tanimlayabilsin
-- operatorleri baglayabilsin
-- kosullara gore farkli branch'lere gidebilsin
-- sonra engine bunu calistirsin
+Ballista'nin uzun vadeli vizyonu su:
 
-Yani proje hazir algoritmalar listesi degil. Hedef, metaheuristic tasarlama dili kurmak.
+- kullanici kod yazmadan kendi metaheuristic fikrini kurabilsin
+- bu fikir klasik algoritmalarla sinirli olmasin
+- kullanici kendi veri temsilini secsin
+- kendi kurallarini, formullerini ve ara heuristic akislarini tanimlayabilsin
+- sistem bu tanimi dogrulasin, calistirsin, gozlemlesin ve UI'de duzenlenebilir tutsun
 
-## Bugun Neye Sahibiz?
+Yani hedef:
 
-Bu repoda su an su katmanlar var:
+"Hazir algoritmalar galerisi yapmak" degil.
 
-- ortak runtime state: `BallistaContext`
-- slot schema: bir verinin ne oldugunu ve nasil temsil edildigini anlatan metadata
-- composable node'lar: `operator`, `sequence`, `loop`, `condition`
-- reusable block mantigi: `subgraph`
-- operator registry: string isimleri gercek Python davranislarina baglayan katman
-- operator param schema: operatorlerin hangi parametreleri bekledigini anlatan katman
-- editor contract / compatibility katmani: UI'nin okuyabilecegi operator-uyumluluk yuzeyi
-- algorithm definition loader: JSON/dict tanimlarini calistirilabilir algoritmaya donusturen katman
-- validation katmani: bozuk veya uyumsuz definition'lari erkenden yakalayan katman
-- expression / rule DSL: kurallari kod yerine veriyle yazabilen katman
-- demo operatorler ve iki demo algoritma
+Asil hedef:
 
-Bu sayede artik algoritmalar sadece Python class olarak degil, veri olarak da tanimlanabiliyor.
+"Metaheuristic tasarlama dili ve editoru kurmak."
 
-## Neden Bu Sirayla Gidiyoruz?
+## Kisa Durus
 
-UI'yi once yapmak kolay gorunur ama yanlistir. Eger motor ve definition katmani zayif olursa, ortaya guzel gorunen ama hizla kisitlanan bir workflow builder cikar.
+Ballista ne olmak istiyor:
 
-Bu yuzden sira su:
+- composable
+- expression-driven
+- strongly inspectable
+- UI-friendly
+- research-friendly
+- plugin-friendly
 
-1. engine
-2. definition dili
-3. schema / params / condition
-4. validation ve DSL
-5. UI
+Ballista ne olmak istemiyor:
 
-Bu repo su an ilk uc adimi baslatmis durumda.
+- sadece GA/SA/ACO secilen bir katalog
+- sadece arka planda kod calistiran bir script wrapper
+- tamamen kontrolsuz serbest kod yurutme ortami
+- guzel gorunen ama kisitli bir workflow builder
 
-## Proje Yapisi
+## Sinirsiz Ozgurluk Konusu
 
-```text
-src/ballista/
-  engine.py       -> algoritma calistirici
-  models.py       -> context, history ve slot schema modelleri
-  nodes.py        -> node tipleri: sequence, loop, operator, condition, subgraph
-  registry.py     -> operator ve stop condition registry
-  definitions.py  -> JSON/dict tabanli definition parser
-  expression.py   -> expression / rule evaluator
-  contracts.py    -> editor contract ve compatibility ciktilari
-  validation.py   -> definition validator
-  examples.py     -> builtin operatorler ve demo algoritmalar
-examples/
-  astro_definition.json
-  labeled_matrix_definition.json
-  run_astro_demo.py
-  run_definition_demo.py
-  run_matrix_demo.py
-tests/
-  test_engine.py
-```
+Projede en kritik tasarim gercegi su:
 
-## Hizli Baslangic
+Tam anlamiyla sinirsiz ozgurluk vermek istemiyoruz ve veremeyiz.
 
-Astro demosu:
+Cunku sinirsiz ozgurluk demek genelde su problemlere gider:
 
-```powershell
-$env:PYTHONPATH="src"
-python examples/run_astro_demo.py
-```
+- guvenlik sorunu
+- dogrulama yapamama
+- UI tarafinda duzenlenemez tanimlar
+- debug edilmesi zor akislar
+- tekrar kullanilamayan yapilar
 
-JSON definition demosu:
+Bu yuzden hedef "sinirsiz kod ozgurlugu" degil.
 
-```powershell
-$env:PYTHONPATH="src"
-python examples/run_definition_demo.py
-```
+Hedef su:
 
-Matrix + label + condition demosu:
+- metaheuristic tasarimi icin pratikte cok genis bir ifade alani sunmak
+- bunu guvenli, denetlenebilir ve editorle uyumlu bir DSL/graph modeliyle yapmak
 
-```powershell
-$env:PYTHONPATH="src"
-python examples/run_matrix_demo.py
-```
+Kisa cevap:
 
-Testler:
+- teorik olarak tam sinirsiz degil
+- pratikte cok genis bir tasarim alani hedefleniyor
+- cok uc durumlarda yine custom operator veya plugin ihtiyaci kalabilir
 
-```powershell
-$env:PYTHONPATH="src"
-python -m unittest discover -s tests
-```
+## Bugunku Durum
 
-Contract introspection demosu:
+Repo su an fikir asamasini asti. Artik ortada calisan bir cekirdek var.
 
-```powershell
-$env:PYTHONPATH="src"
-python examples/run_contract_demo.py
-```
+Bugun olanlar:
+
+- ortak runtime state var
+- slot schema var
+- node tabanli algorithm graph var
+- JSON/dict tabanli definition loader var
+- operator registry var
+- validation var
+- expression DSL var
+- reusable subgraph var
+- parameterized subgraph var
+- editor contract / compatibility output var
+- transform operatorleri var
+
+Bugun olmayanlar:
+
+- drag-and-drop UI
+- visual debugger
+- graph editor
+- user-defined operator authoring UI
+- persistence / project management
+- plugin marketplace
+- experiment comparison paneli
 
 ## Mimari Ozeti
 
@@ -114,18 +103,19 @@ python examples/run_contract_demo.py
 
 `BallistaContext` su bilgileri tasir:
 
-- `slots`: algoritmanin aktif verileri
-- `slot_schema`: slot'larin tur/representation tanimlari
-- `metrics`: iterasyon sirasinda uretilecek metrikler
-- `history`: node bazli calisma kaydi
+- `slots`
+- `slot_schema`
+- `argument_stack`
+- `metrics`
+- `history`
 - `iteration`
 - `stopped`
 
-Bu yapi sayesinde algoritma tek tek fonksiyonlar degil, ortak bir blackboard state uzerinde calisan parcalar haline geliyor.
+Bu sayede algoritma tekil fonksiyonlardan degil, ortak bir blackboard state uzerinde calisan modullerden olusur.
 
 ### 2. Node Modeli
 
-Su an desteklenen node tipleri:
+Desteklenen node tipleri:
 
 - `operator`
 - `sequence`
@@ -133,100 +123,19 @@ Su an desteklenen node tipleri:
 - `condition`
 - `subgraph`
 
-Kisaca:
+Anlamlari:
 
-- `operator`: tek bir islem adimi
+- `operator`: tek bir davranis adimi
 - `sequence`: adimlari sirayla calistirir
-- `loop`: iterative metaheuristic akisini tasir
-- `condition`: runtime state'e bakip branch secer
+- `loop`: iteratif optimisation dongusu
+- `condition`: state'e gore branch secer
+- `subgraph`: tekrar kullanilabilir block cagirir
 
-Bu set daha sonra buyuyebilir:
+### 3. Slot Schema
 
-- `parallel`
-- `termination`
-- `event_hook`
+Slot schema, bir verinin sadece kendisini degil nasil dusunulecegini de tasir.
 
-### 3. Registry
-
-`OperatorRegistry`, definition dosyasindaki string isimleri gercek Python operatorlerine baglar.
-
-Ornek:
-
-- definition icinde `operator: "apply_attraction"`
-- registry icinde `apply_attraction -> Python function`
-
-Bu, UI ile engine arasindaki temel koprudur.
-
-Registry artik sadece handler tutmuyor. Ayni zamanda operatorlerin parametre semasini da tutuyor.
-
-Bu sayede sistem su sorulari sormaya baslayabiliyor:
-
-- bu operator hangi parametreleri bekliyor
-- hangileri zorunlu
-- bir parametre bir `matrix` slot'u mu bekliyor
-- belirli bir representation gerekiyor mu
-
-## Editor Contract / Compatibility
-
-Bu yeni katmanin amaci su:
-
-- UI bir operator listesini makineden okuyabilsin
-- her operatorun hangi parametreleri bekledigini gorebilsin
-- mevcut slot schema'ya gore hangi slot'larin uyumlu oldugunu cikarabilsin
-
-Yani artik Ballista sadece "engine" degil, ayni zamanda editor tarafina bilgi veren bir contract da uretiyor.
-
-Bu contract icinde sunlar var:
-
-- desteklenen node tipleri
-- desteklenen reference root'lari
-- desteklenen expression operatorleri
-- operator listesi
-- operator param semalari
-- mevcut slot schema'ya gore compatibility bilgisi
-
-Ornek bir UI sorusu artik makineden cevap alabilir:
-
-- `construct_labeled_solution` operatorunun `matrix` parametresi icin hangi slot'lar uygun?
-- `decide_search_mode` operatorunun `solution` parametresi icin hangi slot'lar uygun?
-
-Bu katman ileride surukle-birak editor icin cok degerli olacak. Cunku kullaniciya her seyi gostermek yerine yalnizca mantikli secenekleri gosterebiliriz.
-
-### 4. Definition Loader
-
-`definitions.py`, JSON veya dict tanimini alip calisabilir node agacina cevirir.
-
-Bugun destekledigi ana parcalar:
-
-- `slot_definitions`
-- `initial_slots`
-- `root`
-- `operator`
-- `sequence`
-- `loop`
-- `condition`
-- `$ref` tabanli deger cozme
-
-## Slot Schema Neden Onemli?
-
-Senin ihtiyacin sadece "bir matrix olsun" degil. Kullanici ayni zamanda bu verinin nasil dusunulecegini de secebilmeli.
-
-Bu yuzden slot schema'da iki ayri kavram var:
-
-- `kind`: teknik kategori
-- `representation`: anlamsal veya kullanici secimli sunum bicimi
-
-Ornekler:
-
-- `kind: matrix`, `representation: binary`
-- `kind: matrix`, `representation: weighted`
-- `kind: mapping`, `representation: tag_map`
-- `kind: object_collection`, `representation: labeled_graph_view`
-- `kind: object`, `representation: execution_hint`
-
-Bu tasarim kasti olarak biraz gevsek tutuldu. Cunku amac erken asamada kullaniciyi sabit veri tiplerine kilitlememek.
-
-Bugun sistemde slot schema su alanlari tasiyabiliyor:
+Ana alanlar:
 
 - `name`
 - `kind`
@@ -234,139 +143,52 @@ Bugun sistemde slot schema su alanlari tasiyabiliyor:
 - `default`
 - `metadata`
 
-Bu, ileride UI tarafinda su seyleri mumkun kilar:
+Ornekler:
 
-- veri tanim ekranlari
-- representation seciciler
-- node editorde sadece uyumlu slot'lari onerme
-- validation katmani
+- `kind: matrix`, `representation: binary`
+- `kind: matrix`, `representation: weighted`
+- `kind: mapping`, `representation: tag_map`
+- `kind: object_collection`, `representation: labeled_graph_view`
+- `kind: object_collection`, `representation: ranked_subset`
+- `kind: mapping`, `representation: grouped_subset`
 
-## Parametreli Operatorler
+### 4. Registry
 
-Operatorler artik sadece isimle cagrilmiyor; definition icinden parametre de alabiliyor.
+`OperatorRegistry` su isi yapar:
 
-Bu cok onemli cunku ayni operator farkli algoritmalarda farkli sekilde kullanilabilir.
+- operator ismini gercek Python handler'ina baglar
+- operator param schema'sini saklar
+- UI'nin gorecegi contract bilgisini tasir
 
-Ornek:
+### 5. Definition Loader
 
-```json
-{
-  "type": "operator",
-  "name": "construct_labeled_solution",
-  "operator": "construct_labeled_solution",
-  "params": {
-    "matrix": { "$ref": "slots.affinity_matrix" },
-    "labels": { "$ref": "slots.node_labels" },
-    "output_slot": "constructed_solution"
-  }
-}
-```
+`definitions.py` su katmandir:
 
-Burada operator parametreleri:
+- JSON veya dict tanimi alir
+- validate eder
+- node graph'a compile eder
+- initial slots ve slot schema'yi hazirlar
 
-- literal olabilir
-- slot referansi olabilir
-- metric referansi olabilir
-- schema referansi olabilir
-- nested obje/list yapisi olabilir
+### 6. Validation
 
-Su an desteklenen referans kokleri:
+Validator bugun sunlari erkenden yakalayabiliyor:
 
-- `slots`
-- `metrics`
-- `schema`
-- `iteration`
-
-## Reusable Heuristic Block / Subgraph
-
-Bu adim, buyuk algoritmalar icin cok kritik.
-
-Artik definition icinde reusable bloklar tanimlayabiliyoruz:
-
-- bir kere tanimla
-- birden fazla yerde cagir
-- condition veya sequence icinden tekrar kullan
-
-Bu ne kazandiriyor?
-
-- kopyala-yapistir node tanimlari azalir
-- buyuk heuristic akislari moduler hale gelir
-- kullanici kendi mini heuristic block'larini kurmaya yaklasir
-
-Bugun destekledigimiz model:
-
-- top-level `subgraphs` listesi
-- her subgraph icin bir `name`
-- o subgraph'in calistiracagi bir `node`
-- call site tarafinda `type: "subgraph"` ve `ref`
-- call site tarafinda opsiyonel `params`
-- subgraph icinde `args.something` ile bu parametrelere erisim
-
-Bu bugunku haliyle tam "fonksiyon sistemi" degil ama reusable heuristic block mantiginin ilk gercek versiyonu.
-
-Bir anlamda sunu yapabiliyoruz:
-
-- generic bir heuristic block tanimla
-- sonra bunu farkli agirliklar, bias degerleri veya strateji etiketleriyle yeniden cagir
-
-Bu, kullanicinin kendi mini heuristic fonksiyonlarini kurmasina dogru net bir adim.
-
-## Validation Katmani
-
-Artik Ballista definition yuklemeden once temel dogrulama yapiyor.
-
-Bu validator su tip problemleri erken yakalamaya calisiyor:
-
-- eksik `name` veya `root`
+- eksik `name`
+- eksik `root`
 - bilinmeyen node tipi
 - bilinmeyen operator
 - bilinmeyen stop condition
+- bilinmeyen subgraph reference
 - eksik zorunlu operator parametresi
-- gecersiz `$ref`
-- bir operator parametresinin bekledigi slot turu ile verilen slot turunun uyusmamasi
+- bozuk `$ref`
+- unsupported expression operator
+- slot kind / representation uyumsuzlugu
 
-Ornek olarak `construct_labeled_solution` operatoru `matrix` turunde bir slot bekliyor. Sen ona `mapping` turunde bir slot verirsen validator bunu yukleme asamasinda hata olarak isaretler.
+### 7. Expression DSL
 
-Bu katman henuz baslangic halinde. Ama UI'ya gecmeden once cok degerli, cunku kullanicinin yaptigi tanimi daha calistirmadan once anlayip geri bildirim verebilmemizi saglar.
+Ballista'nin ifade gucunun kalbi burasi.
 
-## Condition Node
-
-`condition` node ile artik algoritma lineer akisa mahkum degil.
-
-Ornek kullanim:
-
-- bir matrix yogunsa intensify branch'ine git
-- belirli bir etikete sahip cluster varsa baska local search sec
-- bir metric esigi gecmisse perturb uygula
-
-Desteklenen condition operatorleri:
-
-- `equals`
-- `not_equals`
-- `gt`
-- `gte`
-- `lt`
-- `lte`
-- `contains`
-- `in`
-- `truthy`
-- `all`
-- `any`
-- `not`
-
-Bu su an temel bir katman. Daha sonra expression DSL ile cok daha guclu hale gelecek.
-
-## Expression / Rule DSL
-
-Bu adim, Ballista'nin "sinirsiz ozgurluge ne kadar yaklasabilecegi" sorusunda en kritik esiklerden biri.
-
-Artik parametrelerde ve condition'larda expression kullanabiliyoruz. Bu sayede kullanici su tip kurallari veriyle ifade etmeye yaklasiyor:
-
-- "eger critical label'a sahip ve 3'ten fazla baglantisi olan en az bir eleman varsa intensify et"
-- "eger dense_rows metrikleri 2'nin ustundeyse farkli branch'e git"
-- "bir liste icinden kosula uyan kac eleman var hesapla"
-
-Su an desteklenen expression operatorleri:
+Bugun desteklenen operatorler:
 
 - `ref`
 - `if`
@@ -379,194 +201,397 @@ Su an desteklenen expression operatorleri:
 - `get`
 - `filter`
 - `map`
+- `sort_by`
+- `group_by`
+- `reduce`
+- `sliding_window`
 - `count`
 - `sum`
 
-Expression'lar hem `$ref` kullanabiliyor hem de iterasyon icinde `vars.item` gibi gecici degiskenler kullanabiliyor.
+Bu DSL ile kullanici:
 
-Bu artik sadece "hesap" degil, veri donusumu de demek. Yani kullanici:
+- kurallar yazabilir
+- matematiksel formuller yazabilir
+- listeyi filtreleyebilir
+- yeni obje listesi uretebilir
+- siralayabilir
+- gruplayabilir
+- tek bir ozet objeye katlayabilir
+- kayan pencere mantigiyla lokal pattern cikarabilir
+- ara heuristic gorunumleri yaratabilir
 
-- bir listeyi filtreleyebilir
-- o listenin ustunden yeni bir obje listesi uretebilir
-- ara heuristic gorunumleri olusturabilir
+### 8. Reusable Block / Subgraph
 
-Bu, metaheuristic tasarimi icin cok degerli. Cunku cozum surecinde ana veriyi oldugu gibi kullanmak yerine, ondan ara "working set" veya "priority subset" gibi yapilar turetmek sik ihtiyac olur.
+Artik reusable heuristic block tanimlanabiliyor.
 
-Ornek:
+Bugunki model:
 
-```json
-{
-  "$expr": {
-    "op": "if",
-    "condition": {
-      "op": "gte",
-      "left": {
-        "op": "count",
-        "source": { "$ref": "slots.constructed_solution" },
-        "as": "item",
-        "where": {
-          "op": "eq",
-          "left": { "op": "ref", "path": "vars.item.label" },
-          "right": "critical"
-        }
-      },
-      "right": 1
-    },
-    "then": "intensify",
-    "else": "diversify"
-  }
-}
+- top-level `subgraphs`
+- her biri icin `name`
+- altinda bir `node`
+- call site'da `type: "subgraph"` ve `ref`
+- opsiyonel `params`
+- subgraph icinde `args.*` ile argument kullanimi
+
+Bu tam fonksiyon sistemi degil ama ona giden ilk guclu adim.
+
+### 9. Editor Contract / Compatibility
+
+Bu katman UI icin cok kritik.
+
+Sistem artik makine-okunur sekilde sunlari uretebiliyor:
+
+- desteklenen node tipleri
+- desteklenen expression operatorleri
+- desteklenen reference root'lari
+- operator listesi
+- operator param semalari
+- mevcut slot schema'ya gore compatible slot listeleri
+
+Bu sayede gelecekte editor su sorulara backend sormadan cevap bulabilir:
+
+- bu operator hangi parametreleri istiyor
+- bu parametre icin hangi slotlar mantikli
+- bu veri temsili hangi operatorle uyumlu
+
+## Proje Yapisi
+
+```text
+src/ballista/
+  engine.py       -> algoritma calistirici
+  models.py       -> context, history, slot schema, args stack
+  nodes.py        -> node tipleri
+  registry.py     -> operator registry ve param schema
+  definitions.py  -> definition parser / compiler
+  expression.py   -> expression DSL evaluator
+  validation.py   -> definition validator
+  contracts.py    -> editor contract / compatibility ciktilari
+  examples.py     -> builtin operatorler
+examples/
+  astro_definition.json
+  labeled_matrix_definition.json
+  run_astro_demo.py
+  run_definition_demo.py
+  run_matrix_demo.py
+  run_contract_demo.py
+tests/
+  test_engine.py
 ```
 
-Bu su an son nokta degil ama ilk kez "Python operator yazmadan kural yazma" tarafina gercekten gecmeye basladik.
+## Calistirma
 
-### Matematiksel Formula Konusu
+Astro demo:
 
-Ballista'nin sonunda kullanici kendi matematiksel formullerini tanimlayabilecek mi?
+```powershell
+$env:PYTHONPATH="src"
+python examples/run_astro_demo.py
+```
 
-Kisa cevap: evet, ama kontrollu bir DSL icinde.
+Definition demo:
 
-Yani hedef su:
+```powershell
+$env:PYTHONPATH="src"
+python examples/run_definition_demo.py
+```
 
-- kullanici agirliklar, skorlar, cezalar, yogunluklar, threshold'lar, olasilik benzeri hesaplari yazabilsin
-- bunlari slot, metric ve gecici degiskenlerden hesaplayabilsin
-- bunu Python kodu yazmadan yapabilsin
+Matrix demo:
 
-Ama hedef su degil:
+```powershell
+$env:PYTHONPATH="src"
+python examples/run_matrix_demo.py
+```
 
-- kullaniciya tamamen sinirsiz ham kod calistirma yetkisi vermek
+Contract demo:
 
-Bu fark cok onemli. Cunku Ballista'nin uzun vadede guclu olmasi icin sadece esnek degil, ayni zamanda:
+```powershell
+$env:PYTHONPATH="src"
+python examples/run_contract_demo.py
+```
 
-- guvenli
-- dogrulanabilir
-- UI tarafindan duzenlenebilir
-- debug edilebilir
+Testler:
 
-olmasi gerekiyor.
+```powershell
+$env:PYTHONPATH="src"
+python -m unittest discover -s tests
+```
 
-Yani "sinirsiz ozgurluk"e teorik olarak hicbir zaman tam ulasamayiz. Ama amac, kullanicinin metaheuristic tasarlama alaninda pratikte cok genis bir ozgurluk alani yasamasi.
-
-## Demo'lar
+## Demo'larin Amaci
 
 ### Astro Demo
 
-`astro`, senin anlattigin tarza yakin oyuncak bir metaheuristic prototipi:
+`astro`, bilimsel olarak kanitlanmis bir algoritma iddiasi degil.
 
-1. population olustur
-2. en iyi bireye dogru cekim uygula
-3. yakin bireyleri merge et
-4. local search yap
-5. best'i guncelle
-6. hedef skora gelindiyse dur
+Bu demo sunu gostermek icin var:
 
-Buradaki amac akademik olarak guclu bir algoritma gostermek degil; motorun ozel operator akisini tasiyabildigini gostermek.
+- bir kullanici kafasinda ozel bir operator akisi kurabiliyorsa
+- Ballista o akisi tasiyabiliyor mu
+
+Yani `astro` burada bir "esneklik testi" gibi dusunulmeli.
 
 ### Matrix Demo
 
-`labeled_matrix_definition.json` daha da kritik bir seyi gosteriyor:
+`labeled_matrix_definition.json` bugun sistemin en iyi capability demosu.
 
-1. binary bir matrix tanimla
-2. bu matrix icin label map tanimla
-3. matrix'ten labeled solution view uret
-4. `filter` + `map` ile `priority_nodes` ara gorunumu uret
-5. matematiksel bir expression ile `heuristic_score` hesapla
-6. o skora gore `search_mode` hesapla
-7. `condition` ile intensify veya diversify branch'ine git
-8. bunu inline yazmak yerine reusable subgraph block cagir
-9. sonraki heuristic stratejisini obje olarak yaz
+Bu demo su akisi tasir:
 
-Bu demo, kullanicinin sadece degerleri degil veri temsilini de secebildigi yone dogru attigimiz ilk ciddi adim.
+1. binary matrix tanimla
+2. label map tanimla
+3. matrix'ten `constructed_solution` uret
+4. `filter` + `map` ile `priority_nodes` uret
+5. `group_by` ile `priority_groups` uret
+6. `sort_by` ile `ranked_priority_nodes` uret
+7. `reduce` ile `priority_summary` uret
+8. `sliding_window` ile `window_profiles` uret
+9. formul ile `heuristic_score` hesapla
+10. expression ile `search_mode` sec
+11. `condition` ile branch sec
+12. parameterized subgraph ile strategy object uret
 
-Bu demo artik bir seyi daha gosteriyor:
+Bu demo bugun su seyi kanitliyor:
 
-- karar mantigi Python fonksiyonuna gomulu olmak zorunda degil
-- kuralin kendisi de definition dosyasinda tasinabiliyor
+- veri temsilini tasiyabiliyoruz
+- ara veri gorunumleri uretebiliyoruz
+- matematiksel formula yazabiliyoruz
+- reusable heuristic block cagirabiliyoruz
+
+## Tasarim Prensipleri
+
+Bu repo icin karar alirken izledigimiz prensipler:
+
+- UI once degil, motor once
+- davranis koddan veriye dogru kaymali
+- ifade gucu artarken validation da artmali
+- editor contract'i basindan dusunulmeli
+- tekrar kullanilabilir parcalar onemli
+- sistem acik olmali ama kontrolsuz olmamali
+
+## Yol Haritasi
+
+Asagidaki roadmap, projeyi asama asama nereye goturmek istedigimizi gosteriyor.
+
+### M0 - Foundation
+
+Hedef:
+
+- basic engine
+- context
+- node modeli
+- test iskeleti
+
+Durum:
+
+- tamamlandi
+
+### M1 - Definition Language
+
+Hedef:
+
+- algorithm definition'i veri olarak ifade etmek
+- JSON/dict yukleme
+- root graph compile etmek
+
+Durum:
+
+- tamamlandi
+
+### M2 - Validation And Contracts
+
+Hedef:
+
+- definition validator
+- operator param schema
+- editor contract
+- compatibility output
+
+Durum:
+
+- buyuk oranda tamamlandi
+
+### M3 - Expression DSL
+
+Hedef:
+
+- kosul yazmak
+- matematiksel formula yazmak
+- slot/metric/schema/args referansi kullanmak
+
+Durum:
+
+- ilk guclu versiyon tamamlandi
+
+### M4 - Transform DSL
+
+Hedef:
+
+- `filter`
+- `map`
+- `sort_by`
+- `group_by`
+- ara heuristic gorunumleri uretmek
+
+Durum:
+
+- ilk versiyon tamamlandi
+
+### M5 - Heuristic Composition
+
+Hedef:
+
+- reusable subgraph
+- parameterized subgraph
+- generic heuristic block
+
+Durum:
+
+- ilk versiyon tamamlandi
+
+### M6 - Advanced DSL
+
+Hedef:
+
+- daha zengin reduce operatorleri
+- window/sliding operators
+- graph-specific transforms
+- cluster / neighborhood operators
+- daha guclu path/reference sistemi
+
+Durum:
+
+- reduce ve sliding window ilk versiyonuyla basladi
+- graph-specific transforms hala siradaki mantikli buyuk adim
+
+### M7 - Authoring Experience
+
+Hedef:
+
+- CLI authoring tools
+- better error messages
+- definition formatter
+- definition linter
+- stronger compatibility rules
+
+Durum:
+
+- henuz baslanmadi
+
+### M8 - Visual Product
+
+Hedef:
+
+- drag-and-drop graph editor
+- operator palette
+- slot editor
+- formula editor
+- run monitor
+- trace / metrics explorer
+
+Durum:
+
+- uzun vadeli hedef
+
+### M9 - Ecosystem
+
+Hedef:
+
+- plugin system
+- operator packs
+- saved templates
+- experiment comparison
+- maybe marketplace
+
+Durum:
+
+- uzun vadeli hedef
+
+## Yakin Rota
+
+Bugunden sonra teknik olarak en mantikli yakin rota su:
+
+1. graph-specific transforms
+2. operator compatibility kurallarini daha akilli hale getirmek
+3. stronger definition contract
+4. CLI tabanli authoring / inspect tooling
+5. sonra UI prototipi
+
+## Milestone Mantigi
+
+Milestone'lar arasindaki iliski:
+
+- M0-M2 olmadan editor akli olmaz
+- M3-M6 olmadan kullaniciya gercek ifade ozgurlugu verilemez
+- M7 olmadan authoring aci verici olur
+- M8 olmadan urun hissi gelmez
+- M9 olmadan ekosistem olmaz
 
 ## Su An Neler Eksik?
 
-Simdiki sistem gucleniyor ama henuz tam urun degil.
+Repo ilerledi ama henuz tam urun degil.
 
-Eksik olan temel katmanlar:
+Eksik olan ana parcalar:
 
-- definition validation
-- daha guvenli ve daha zengin expression / rule DSL
-- user-defined operator authoring
-- operator param schema'lari
-- branching'in daha zengin turleri
-- reusable subgraph'lar
-- UI / drag-and-drop editor
-- trace visualization
-- plugin tabanli operator marketplace
+- daha zengin DSL
+- domain-specific heuristic primitive'ler
+- graph / neighborhood transform'lari
+- better diagnostics
+- persistence layer
+- visual editor
+- run trace viewer
+- result comparison UI
 
-Yani bugun "motorun ciddi bir prototipi" var; "son kullanici uygulamasi" daha yok.
+## Sonraki Sohbet Icin Handoff
 
-## Bir Sonraki Mantikli Teknik Adim
+Bu bolum dogrudan sonraki chat icin.
 
-Buradan sonra en mantikli is sirasiyla:
+Su anki calisan capability listesi:
 
-1. expression DSL
-2. daha zengin ref/path sistemi
-3. reusable subgraph ve operator library yapisi
-4. operator compatibility kurallari
-5. UI tarafina uygun daha net definition contract'i
+- algorithm definition yukleme
+- slot schema
+- parametreli operator
+- condition
+- expression DSL
+- formula DSL
+- filter/map/sort/group transforms
+- reduce/window transforms
+- parameterized subgraph
+- contract export
+- compatibility output
 
-Validation ve param schema katmani artik basladi. Bir sonraki buyuk esik expression/rule tarafi.
+En mantikli bir sonraki teknik hedef:
 
-Yine de validatori daha da guclendirmemiz gerekecek. Ozellikle su sorular icin:
+- graph-specific transforms
+- cluster / neighborhood transforms
+- daha guclu reduce patterns
 
-- bu slot bu operator icin uygun mu
-- bu branch condition'i gecerli mi
-- bu representation ile bu operator birlikte kullanilabilir mi
-- bu definition eksik veya bozuk mu
+Neden?
 
-## Sonraki Sohbet Icin Durum Hafizasi
+Cunku su an kullanici:
 
-Bu bolum, baska chate gecildiginde hizli devam etmek icin.
+- veri secip donusturebiliyor
+- ama graph yapisi, neighborhood iliskileri ve daha domain-specific search mechanics tarafini hala rahat ifade edemiyor
 
-Su anki durum:
+Yani bir sonraki adim ifade alanini "ara heuristic view" seviyesinden "gercek search mechanics" seviyesine buyutmeli.
 
-- repo Python tabanli Ballista cekirdegi
-- engine, context, history ve node sistemi hazir
-- algorithm definition JSON/dict olarak yuklenebiliyor
-- `slot_schema` ile veri temsili metadata'si tasinabiliyor
-- operatorler runtime parametre alabiliyor
-- `condition` node ile branching var
-- expression DSL ile kurallar veri olarak yazilabiliyor
-- parametre alabilen reusable subgraph block'lari var
-- UI'nin okuyabilecegi editor contract / compatibility ciktilari var
-- list/object transform yapabilen expression operatorleri var
-- `astro` demo calisiyor
-- `matrix + label + branch` demo calisiyor
-- testler geciyor
+## Kisa Ozet
 
-Bir sonraki mantikli hedef:
+Ballista su an:
 
-"Expression DSL'i genisletip daha guclu user-defined heuristic mekanizmalarina gecmek."
+- sadece fikir degil
+- sadece script degil
+- sadece demo da degil
 
-Yani sonraki sohbette dogrudan su islere girilebilir:
+Bugun artik:
 
-- expression DSL'de list/object transform operatorleri
-- reusable subgraph/operator composition
-- user-defined heuristic block'lari
-- UI'nin tukecegi daha net bir definition contract'i
-
-## Ozet
-
-Ballista artik sadece fikir notu degil.
-
-Su an:
-
-- algoritma motoru var
-- veri tabanli algorithm definition var
-- schema ile veri temsilini de ifade etmeye basladik
-- branching ve parametreli operator katmani var
-- expression tabanli kural yazimi basladi
+- engine var
+- definition dili var
+- validation var
+- expression DSL var
+- reusable heuristic block var
+- editor contract var
 
 Henuz yok:
 
-- tam kodsuz son kullanici urunu
-- sinirsiz custom rule editor
-- gorsel builder
+- tam urun
+- visual builder
+- tamamen kodsuz son kullanici deneyimi
 
-Ama artik dogru omurgayi kuruyoruz.
+Ama omurga dogru kuruluyor.

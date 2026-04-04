@@ -53,6 +53,30 @@
       "default": []
     },
     {
+      "name": "ranked_priority_nodes",
+      "kind": "object_collection",
+      "representation": "ranked_subset",
+      "default": []
+    },
+    {
+      "name": "priority_groups",
+      "kind": "mapping",
+      "representation": "grouped_subset",
+      "default": {}
+    },
+    {
+      "name": "priority_summary",
+      "kind": "object",
+      "representation": "reduced_summary",
+      "default": {}
+    },
+    {
+      "name": "window_profiles",
+      "kind": "object_collection",
+      "representation": "window_profile",
+      "default": []
+    },
+    {
       "name": "next_strategy",
       "kind": "object",
       "representation": "execution_hint",
@@ -159,10 +183,202 @@
       },
       {
         "type": "operator",
+        "name": "set_priority_groups",
+        "operator": "set_slot_value",
+        "message": "priority nodes grouped by label",
+        "snapshot_keys": ["priority_groups"],
+        "params": {
+          "slot": "priority_groups",
+          "value": {
+            "$expr": {
+              "op": "group_by",
+              "source": {
+                "$ref": "slots.priority_nodes"
+              },
+              "as": "item",
+              "key": {
+                "op": "ref",
+                "path": "vars.item.label"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_ranked_priority_nodes",
+        "operator": "set_slot_value",
+        "message": "priority nodes ranked by strength",
+        "snapshot_keys": ["ranked_priority_nodes"],
+        "params": {
+          "slot": "ranked_priority_nodes",
+          "value": {
+            "$expr": {
+              "op": "sort_by",
+              "source": {
+                "$ref": "slots.priority_nodes"
+              },
+              "as": "item",
+              "key": {
+                "op": "ref",
+                "path": "vars.item.strength"
+              },
+              "descending": true
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_priority_summary",
+        "operator": "set_slot_value",
+        "message": "priority nodes reduced into a summary object",
+        "snapshot_keys": ["priority_summary"],
+        "params": {
+          "slot": "priority_summary",
+          "value": {
+            "$expr": {
+              "op": "reduce",
+              "source": {
+                "$ref": "slots.priority_nodes"
+              },
+              "as": "item",
+              "accumulator_as": "acc",
+              "initial": {
+                "total_strength": 0,
+                "critical_count": 0,
+                "total_nodes": 0,
+                "avg_strength": 0
+              },
+              "value": {
+                "total_strength": {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "ref",
+                      "path": "vars.acc.total_strength"
+                    },
+                    {
+                      "op": "ref",
+                      "path": "vars.item.strength"
+                    }
+                  ]
+                },
+                "critical_count": {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "ref",
+                      "path": "vars.acc.critical_count"
+                    },
+                    {
+                      "op": "if",
+                      "condition": {
+                        "op": "eq",
+                        "left": {
+                          "op": "ref",
+                          "path": "vars.item.label"
+                        },
+                        "right": "critical"
+                      },
+                      "then": 1,
+                      "else": 0
+                    }
+                  ]
+                },
+                "total_nodes": {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "ref",
+                      "path": "vars.acc.total_nodes"
+                    },
+                    1
+                  ]
+                },
+                "avg_strength": {
+                  "op": "div",
+                  "left": {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "ref",
+                        "path": "vars.acc.total_strength"
+                      },
+                      {
+                        "op": "ref",
+                        "path": "vars.item.strength"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "ref",
+                        "path": "vars.acc.total_nodes"
+                      },
+                      1
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_window_profiles",
+        "operator": "set_slot_value",
+        "message": "ranked nodes evaluated through sliding windows",
+        "snapshot_keys": ["window_profiles"],
+        "params": {
+          "slot": "window_profiles",
+          "value": {
+            "$expr": {
+              "op": "sliding_window",
+              "source": {
+                "$ref": "slots.ranked_priority_nodes"
+              },
+              "size": 2,
+              "as": "window",
+              "value": {
+                "labels": {
+                  "op": "map",
+                  "source": {
+                    "op": "ref",
+                    "path": "vars.window"
+                  },
+                  "as": "item",
+                  "value": {
+                    "op": "ref",
+                    "path": "vars.item.label"
+                  }
+                },
+                "combined_strength": {
+                  "op": "sum",
+                  "source": {
+                    "op": "ref",
+                    "path": "vars.window"
+                  },
+                  "as": "item",
+                  "value": {
+                    "op": "ref",
+                    "path": "vars.item.strength"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
         "name": "set_heuristic_score",
         "operator": "set_slot_value",
         "message": "heuristic score computed from a mathematical formula",
-        "snapshot_keys": ["heuristic_score", "priority_nodes"],
+        "snapshot_keys": ["heuristic_score", "priority_nodes", "ranked_priority_nodes", "priority_summary", "window_profiles"],
         "params": {
           "slot": "heuristic_score",
           "value": {
@@ -185,22 +401,15 @@
                     "op": "mul",
                     "args": [
                       {
-                        "op": "count",
-                        "source": {
-                          "$ref": "slots.priority_nodes"
-                        },
-                        "as": "item",
-                        "where": {
-                          "op": "eq",
-                          "left": {
-                            "op": "ref",
-                            "path": "vars.item.label"
-                          },
-                          "right": "critical"
-                        }
+                        "op": "ref",
+                        "path": "slots.priority_summary.critical_count"
                       },
                       2.4
                     ]
+                  },
+                  {
+                    "op": "ref",
+                    "path": "slots.priority_summary.avg_strength"
                   },
                   {
                     "op": "if",
@@ -209,7 +418,7 @@
                       "left": {
                         "op": "len",
                         "value": {
-                          "$ref": "slots.priority_nodes"
+                          "$ref": "slots.window_profiles"
                         }
                       },
                       "right": 0
@@ -219,18 +428,18 @@
                       "left": {
                         "op": "sum",
                         "source": {
-                          "$ref": "slots.priority_nodes"
+                          "$ref": "slots.window_profiles"
                         },
                         "as": "item",
                         "value": {
                           "op": "ref",
-                          "path": "vars.item.strength"
+                          "path": "vars.item.combined_strength"
                         }
                       },
                       "right": {
                         "op": "len",
                         "value": {
-                          "$ref": "slots.priority_nodes"
+                          "$ref": "slots.window_profiles"
                         }
                       }
                     },

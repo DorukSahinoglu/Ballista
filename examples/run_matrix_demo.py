@@ -27,6 +27,11 @@ def main() -> None:
     print(f"Search mode: {result.get('search_mode')}")
     print(f"Heuristic score: {result.get('heuristic_score')}")
     print(f"Priority nodes: {len(result.get('priority_nodes', []))}")
+    print(f"Priority groups: {list(result.get('priority_groups', {}).keys())}")
+    print(f"Priority summary: {result.get('priority_summary')}")
+    print(f"Window profiles: {len(result.get('window_profiles', []))}")
+    ranked = result.get("ranked_priority_nodes", [])
+    print(f"Top priority node: {ranked[0]['label'] if ranked else 'none'}")
     print(f"Next strategy: {result.get('next_strategy')}")
     print(f"Dense rows: {result.metrics.get('dense_rows')}")
 

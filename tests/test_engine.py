@@ -129,6 +129,30 @@ class EngineTests(unittest.TestCase):
                     "default": [],
                 },
                 {
+                    "name": "ranked_priority_nodes",
+                    "kind": "object_collection",
+                    "representation": "ranked_subset",
+                    "default": [],
+                },
+                {
+                    "name": "priority_groups",
+                    "kind": "mapping",
+                    "representation": "grouped_subset",
+                    "default": {},
+                },
+                {
+                    "name": "priority_summary",
+                    "kind": "object",
+                    "representation": "reduced_summary",
+                    "default": {},
+                },
+                {
+                    "name": "window_profiles",
+                    "kind": "object_collection",
+                    "representation": "window_profile",
+                    "default": [],
+                },
+                {
                     "name": "next_strategy",
                     "kind": "object",
                     "representation": "execution_hint",
@@ -216,6 +240,155 @@ class EngineTests(unittest.TestCase):
                     },
                     {
                         "type": "operator",
+                        "name": "set_priority_groups",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "priority_groups",
+                            "value": {
+                                "$expr": {
+                                    "op": "group_by",
+                                    "source": {"$ref": "slots.priority_nodes"},
+                                    "as": "item",
+                                    "key": {
+                                        "op": "ref",
+                                        "path": "vars.item.label",
+                                    },
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_ranked_priority_nodes",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "ranked_priority_nodes",
+                            "value": {
+                                "$expr": {
+                                    "op": "sort_by",
+                                    "source": {"$ref": "slots.priority_nodes"},
+                                    "as": "item",
+                                    "key": {
+                                        "op": "ref",
+                                        "path": "vars.item.strength",
+                                    },
+                                    "descending": True,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_priority_summary",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "priority_summary",
+                            "value": {
+                                "$expr": {
+                                    "op": "reduce",
+                                    "source": {"$ref": "slots.priority_nodes"},
+                                    "as": "item",
+                                    "accumulator_as": "acc",
+                                    "initial": {
+                                        "total_strength": 0,
+                                        "critical_count": 0,
+                                        "total_nodes": 0,
+                                        "avg_strength": 0,
+                                    },
+                                    "value": {
+                                        "total_strength": {
+                                            "op": "add",
+                                            "args": [
+                                                {"op": "ref", "path": "vars.acc.total_strength"},
+                                                {"op": "ref", "path": "vars.item.strength"},
+                                            ],
+                                        },
+                                        "critical_count": {
+                                            "op": "add",
+                                            "args": [
+                                                {"op": "ref", "path": "vars.acc.critical_count"},
+                                                {
+                                                    "op": "if",
+                                                    "condition": {
+                                                        "op": "eq",
+                                                        "left": {
+                                                            "op": "ref",
+                                                            "path": "vars.item.label",
+                                                        },
+                                                        "right": "critical",
+                                                    },
+                                                    "then": 1,
+                                                    "else": 0,
+                                                },
+                                            ],
+                                        },
+                                        "total_nodes": {
+                                            "op": "add",
+                                            "args": [
+                                                {"op": "ref", "path": "vars.acc.total_nodes"},
+                                                1,
+                                            ],
+                                        },
+                                        "avg_strength": {
+                                            "op": "div",
+                                            "left": {
+                                                "op": "add",
+                                                "args": [
+                                                    {"op": "ref", "path": "vars.acc.total_strength"},
+                                                    {"op": "ref", "path": "vars.item.strength"},
+                                                ],
+                                            },
+                                            "right": {
+                                                "op": "add",
+                                                "args": [
+                                                    {"op": "ref", "path": "vars.acc.total_nodes"},
+                                                    1,
+                                                ],
+                                            },
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_window_profiles",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "window_profiles",
+                            "value": {
+                                "$expr": {
+                                    "op": "sliding_window",
+                                    "source": {"$ref": "slots.ranked_priority_nodes"},
+                                    "size": 2,
+                                    "as": "window",
+                                    "value": {
+                                        "labels": {
+                                            "op": "map",
+                                            "source": {"op": "ref", "path": "vars.window"},
+                                            "as": "item",
+                                            "value": {
+                                                "op": "ref",
+                                                "path": "vars.item.label",
+                                            },
+                                        },
+                                        "combined_strength": {
+                                            "op": "sum",
+                                            "source": {"op": "ref", "path": "vars.window"},
+                                            "as": "item",
+                                            "value": {
+                                                "op": "ref",
+                                                "path": "vars.item.strength",
+                                            },
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
                         "name": "set_heuristic_score",
                         "operator": "set_slot_value",
                         "params": {
@@ -236,29 +409,18 @@ class EngineTests(unittest.TestCase):
                                             {
                                                 "op": "mul",
                                                 "args": [
-                                                    {
-                                                        "op": "count",
-                                                        "source": {"$ref": "slots.priority_nodes"},
-                                                        "as": "item",
-                                                        "where": {
-                                                            "op": "eq",
-                                                            "left": {
-                                                                "op": "ref",
-                                                                "path": "vars.item.label",
-                                                            },
-                                                            "right": "critical",
-                                                        },
-                                                    },
+                                                    {"op": "ref", "path": "slots.priority_summary.critical_count"},
                                                     2.4,
                                                 ],
                                             },
+                                            {"op": "ref", "path": "slots.priority_summary.avg_strength"},
                                             {
                                                 "op": "if",
                                                 "condition": {
                                                     "op": "gt",
                                                     "left": {
                                                         "op": "len",
-                                                        "value": {"$ref": "slots.priority_nodes"},
+                                                        "value": {"$ref": "slots.window_profiles"},
                                                     },
                                                     "right": 0,
                                                 },
@@ -266,16 +428,16 @@ class EngineTests(unittest.TestCase):
                                                     "op": "div",
                                                     "left": {
                                                         "op": "sum",
-                                                        "source": {"$ref": "slots.priority_nodes"},
+                                                        "source": {"$ref": "slots.window_profiles"},
                                                         "as": "item",
                                                         "value": {
                                                             "op": "ref",
-                                                            "path": "vars.item.strength",
+                                                            "path": "vars.item.combined_strength",
                                                         },
                                                     },
                                                     "right": {
                                                         "op": "len",
-                                                        "value": {"$ref": "slots.priority_nodes"},
+                                                        "value": {"$ref": "slots.window_profiles"},
                                                     },
                                                 },
                                                 "else": 0,
@@ -352,8 +514,13 @@ class EngineTests(unittest.TestCase):
         self.assertIsInstance(loaded.slot_schema["affinity_matrix"], SlotDefinition)
         self.assertEqual(loaded.slot_schema["affinity_matrix"].representation, "binary")
         self.assertEqual(result.get("search_mode"), "intensify")
-        self.assertEqual(result.get("heuristic_score"), 8.4)
+        self.assertEqual(result.get("heuristic_score"), 15.0)
         self.assertEqual(len(result.get("priority_nodes")), 2)
+        self.assertEqual(sorted(result.get("priority_groups").keys()), ["critical", "entry"])
+        self.assertAlmostEqual(result.get("ranked_priority_nodes")[0]["strength"], 3.3)
+        self.assertEqual(result.get("priority_summary")["critical_count"], 1)
+        self.assertAlmostEqual(result.get("priority_summary")["avg_strength"], 3.3)
+        self.assertEqual(result.get("window_profiles")[0]["labels"], ["entry", "critical"])
         self.assertEqual(result.get("priority_nodes")[1]["label"], "critical")
         self.assertEqual(result.get("next_strategy")["phase"], "intensify")
         self.assertEqual(result.get("next_strategy")["primary_weight"], 0.9)
@@ -489,6 +656,7 @@ class EngineTests(unittest.TestCase):
         operator_names = [item["name"] for item in contract["operators"]]
         self.assertIn("construct_labeled_solution", operator_names)
         self.assertIn("supported_expression_operators", contract)
+        self.assertIn("reduce", contract["supported_expression_operators"])
 
 
 if __name__ == "__main__":

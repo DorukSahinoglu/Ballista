@@ -577,6 +577,85 @@ def _validate_expression(
             _validate_expression_operand(expression[required_key], f"{path}.{required_key}", slot_schema, issues)
         return
 
+    if operator == "sort_by":
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message="Expression sort_by requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        alias = expression.get("as")
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            issues.append(ValidationIssue(path=f"{path}.as", message="Expression alias must be a string"))
+
+        if "key" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.key", message="Expression sort_by requires 'key'"))
+        else:
+            _validate_expression_operand(expression["key"], f"{path}.key", slot_schema, issues)
+
+        if "descending" in expression:
+            _validate_expression_operand(expression["descending"], f"{path}.descending", slot_schema, issues)
+        return
+
+    if operator == "group_by":
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message="Expression group_by requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        alias = expression.get("as")
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            issues.append(ValidationIssue(path=f"{path}.as", message="Expression alias must be a string"))
+
+        if "key" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.key", message="Expression group_by requires 'key'"))
+        else:
+            _validate_expression_operand(expression["key"], f"{path}.key", slot_schema, issues)
+
+        if "value" in expression:
+            _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
+        return
+
+    if operator == "sliding_window":
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message="Expression sliding_window requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        alias = expression.get("as")
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            issues.append(ValidationIssue(path=f"{path}.as", message="Expression alias must be a string"))
+
+        if "size" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.size", message="Expression sliding_window requires 'size'"))
+        else:
+            _validate_expression_operand(expression["size"], f"{path}.size", slot_schema, issues)
+
+        if "value" in expression:
+            _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
+        return
+
+    if operator == "reduce":
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message="Expression reduce requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for alias_key in ("as", "accumulator_as"):
+            alias = expression.get(alias_key)
+            if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+                issues.append(ValidationIssue(path=f"{path}.{alias_key}", message="Expression alias must be a string"))
+
+        if "initial" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.initial", message="Expression reduce requires 'initial'"))
+        else:
+            _validate_expression_operand(expression["initial"], f"{path}.initial", slot_schema, issues)
+
+        if "value" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.value", message="Expression reduce requires 'value'"))
+        else:
+            _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
+        return
+
     if operator in {"count", "sum"}:
         if "source" not in expression:
             issues.append(ValidationIssue(path=f"{path}.source", message=f"Expression {operator} requires 'source'"))
