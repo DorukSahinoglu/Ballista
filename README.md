@@ -205,6 +205,22 @@ Bugun desteklenen operatorler:
 - `group_by`
 - `reduce`
 - `sliding_window`
+- `neighbors_of`
+- `matrix_degrees`
+- `connected_components`
+- `edge_pairs`
+- `neighborhood_overlap`
+- `reachable_within`
+- `shortest_path`
+- `propagate_signal`
+- `random_walk`
+- `flow_profile`
+- `triangle_patterns`
+- `centrality_profile`
+- `closeness_profile`
+- `policy_walk`
+- `star_patterns`
+- `square_patterns`
 - `count`
 - `sum`
 
@@ -218,6 +234,22 @@ Bu DSL ile kullanici:
 - gruplayabilir
 - tek bir ozet objeye katlayabilir
 - kayan pencere mantigiyla lokal pattern cikarabilir
+- matrix icinden komsuluk profili cikarabilir
+- graph degree gorunumu uretebilir
+- component yapisi cikarabilir
+- edge listesi cikarabilir
+- iki neighborhood arasindaki overlap'i hesaplayabilir
+- multi-hop erisim alani cikarabilir
+- iki node arasinda yol bulabilir
+- graph uzerinde basit sinyal yayilimi hesaplayabilir
+- deterministic random walk profili uretebilir
+- source-target traffic / flow ozeti cikarabilir
+- triangle motif/pattern tespiti yapabilir
+- centrality profili cikarabilir
+- closeness profili cikarabilir
+- policy-guided walk tanimlayabilir
+- star benzeri motifleri tespit edebilir
+- square benzeri motifleri tespit edebilir
 - ara heuristic gorunumleri yaratabilir
 
 ### 8. Reusable Block / Subgraph
@@ -342,15 +374,37 @@ Bu demo su akisi tasir:
 6. `sort_by` ile `ranked_priority_nodes` uret
 7. `reduce` ile `priority_summary` uret
 8. `sliding_window` ile `window_profiles` uret
-9. formul ile `heuristic_score` hesapla
-10. expression ile `search_mode` sec
-11. `condition` ile branch sec
-12. parameterized subgraph ile strategy object uret
+9. `matrix_degrees` ile `degree_view` uret
+10. `neighbors_of` ile `critical_neighbors` uret
+11. `connected_components` ile cluster gorunumu uret
+12. `edge_pairs` ile edge listesi uret
+13. `neighborhood_overlap` ile kritik overlap profili uret
+14. `reachable_within` ile multi-hop erisim profili uret
+15. `shortest_path` ile yol profili uret
+16. `propagate_signal` ile yayilim profili uret
+17. `random_walk` ile walk profili uret
+18. `flow_profile` ile traffic/flow profili uret
+19. `triangle_patterns` ile motif tespiti yap
+20. `centrality_profile` ile merkezilik profili uret
+21. `closeness_profile` ile ikinci merkezilik ailesini uret
+22. `policy_walk` ile yonlendirilmis walk profili uret
+23. `star_patterns` ile star benzeri motifleri bul
+24. `square_patterns` ile square benzeri motifleri bul
+25. formul ile `heuristic_score` hesapla
+26. expression ile `search_mode` sec
+27. `condition` ile branch sec
+28. parameterized subgraph ile strategy object uret
 
 Bu demo bugun su seyi kanitliyor:
 
 - veri temsilini tasiyabiliyoruz
 - ara veri gorunumleri uretebiliyoruz
+- neighborhood ve degree mantigini DSL icine tasiyabiliyoruz
+- graph component ve overlap mantigini da ifade edebiliyoruz
+- multi-hop reach, shortest path ve basic propagation mantigini da ifade edebiliyoruz
+- random walk, traffic/flow ve basit motif tespitini de ifade edebiliyoruz
+- centrality ve policy-guided walk mantigini da ifade edebiliyoruz
+- ikinci merkezilik ailesi ve ikinci motif ailesi de geldi
 - matematiksel formula yazabiliyoruz
 - reusable heuristic block cagirabiliyoruz
 
@@ -458,7 +512,13 @@ Hedef:
 Durum:
 
 - reduce ve sliding window ilk versiyonuyla basladi
-- graph-specific transforms hala siradaki mantikli buyuk adim
+- graph-specific transforms ilk versiyonuyla basladi
+- cluster / neighborhood primitive'leri ilk versiyonuyla basladi
+- path / propagation primitive'leri ilk versiyonuyla basladi
+- flow, walk ve graph-pattern primitive'leri ilk versiyonuyla basladi
+- centrality, walk policy ve star motifleri ilk versiyonuyla basladi
+- closeness ve square motifleri ilk versiyonuyla basladi
+- daha zengin centrality aileleri, walk policy secenekleri ve motif aileleri hala siradaki mantikli buyuk adim
 
 ### M7 - Authoring Experience
 
@@ -507,11 +567,15 @@ Durum:
 
 Bugunden sonra teknik olarak en mantikli yakin rota su:
 
-1. graph-specific transforms
-2. operator compatibility kurallarini daha akilli hale getirmek
-3. stronger definition contract
-4. CLI tabanli authoring / inspect tooling
-5. sonra UI prototipi
+1. cluster / neighborhood operatorlerini buyutmek
+2. path / propagation operatorlerini buyutmek
+3. flow / walk / graph pattern primitive'lerini buyutmek
+4. centrality / motif ailelerini buyutmek
+5. walk policy seceneklerini buyutmek
+6. operator compatibility kurallarini daha akilli hale getirmek
+7. stronger definition contract
+8. CLI tabanli authoring / inspect tooling
+9. sonra UI prototipi
 
 ## Milestone Mantigi
 
@@ -531,7 +595,7 @@ Eksik olan ana parcalar:
 
 - daha zengin DSL
 - domain-specific heuristic primitive'ler
-- graph / neighborhood transform'lari
+- graph / neighborhood transform'larini derinlestirmek
 - better diagnostics
 - persistence layer
 - visual editor
@@ -552,6 +616,12 @@ Su anki calisan capability listesi:
 - formula DSL
 - filter/map/sort/group transforms
 - reduce/window transforms
+- graph/neighborhood transforms
+- connected component / edge / overlap transforms
+- path / reach / propagation transforms
+- walk / flow / triangle pattern transforms
+- centrality / policy walk / star pattern transforms
+- closeness / square pattern transforms
 - parameterized subgraph
 - contract export
 - compatibility output
@@ -560,6 +630,11 @@ En mantikli bir sonraki teknik hedef:
 
 - graph-specific transforms
 - cluster / neighborhood transforms
+- graph pattern primitive'leri
+- path / propagation primitive'leri
+- walk / flow primitive'leri
+- centrality / policy primitive'leri
+- closeness / square motif primitive'leri
 - daha guclu reduce patterns
 
 Neden?
@@ -567,7 +642,12 @@ Neden?
 Cunku su an kullanici:
 
 - veri secip donusturebiliyor
-- ama graph yapisi, neighborhood iliskileri ve daha domain-specific search mechanics tarafini hala rahat ifade edemiyor
+- ama graph yapisi, neighborhood iliskileri ve daha domain-specific search mechanics tarafini hala kisitli primitive'lerle ifade ediyor
+- path bulma ve basit propagation ilk versiyonuyla geldi
+- random walk, flow ve triangle pattern detection ilk versiyonuyla geldi
+- centrality, policy walk ve star motifleri ilk versiyonuyla geldi
+- closeness ve square motifleri de ilk versiyonuyla geldi
+- ama richer centrality families, daha zengin walk policy control ve daha genis motif aileleri henuz yok
 
 Yani bir sonraki adim ifade alanini "ara heuristic view" seviyesinden "gercek search mechanics" seviyesine buyutmeli.
 

@@ -634,6 +634,277 @@ def _validate_expression(
             _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
         return
 
+    if operator == "neighbors_of":
+        for key in ("source", "node_index"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression neighbors_of requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "matrix_degrees":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression matrix_degrees requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "connected_components":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression connected_components requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "edge_pairs":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression edge_pairs requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "directed"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "neighborhood_overlap":
+        for key in ("source", "left_node_index", "right_node_index"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression neighborhood_overlap requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "reachable_within":
+        for key in ("source", "start_node_index", "max_depth"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression reachable_within requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected", "include_start"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "shortest_path":
+        for key in ("source", "start_node_index", "target_node_index"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression shortest_path requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "propagate_signal":
+        for key in ("source", "seed_nodes", "steps"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression propagate_signal requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in (
+            "labels",
+            "active_value",
+            "include_self",
+            "undirected",
+            "decay",
+            "initial_strength",
+        ):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "random_walk":
+        for key in ("source", "start_node_index", "steps"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression random_walk requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected", "seed"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "flow_profile":
+        for key in ("source", "source_nodes", "target_nodes"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression flow_profile requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "triangle_patterns":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression triangle_patterns requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "centrality_profile":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression centrality_profile requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "closeness_profile":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression closeness_profile requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "policy_walk":
+        for key in ("source", "start_node_index", "steps"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression policy_walk requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected", "policy"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "star_patterns":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression star_patterns requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self", "undirected", "min_degree", "max_leaf_degree"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "square_patterns":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression square_patterns requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "include_self"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
     if operator == "reduce":
         if "source" not in expression:
             issues.append(ValidationIssue(path=f"{path}.source", message="Expression reduce requires 'source'"))
