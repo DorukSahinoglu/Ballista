@@ -209,9 +209,11 @@ Bugun desteklenen operatorler:
 - `matrix_degrees`
 - `connected_components`
 - `edge_pairs`
+- `edge_strength_profile`
 - `neighborhood_overlap`
 - `reachable_within`
 - `shortest_path`
+- `weighted_shortest_path`
 - `propagate_signal`
 - `random_walk`
 - `flow_profile`
@@ -219,6 +221,7 @@ Bugun desteklenen operatorler:
 - `centrality_profile`
 - `closeness_profile`
 - `policy_walk`
+- `weighted_policy_walk`
 - `star_patterns`
 - `square_patterns`
 - `count`
@@ -238,9 +241,11 @@ Bu DSL ile kullanici:
 - graph degree gorunumu uretebilir
 - component yapisi cikarabilir
 - edge listesi cikarabilir
+- weighted edge gucunu siralayabilir
 - iki neighborhood arasindaki overlap'i hesaplayabilir
 - multi-hop erisim alani cikarabilir
 - iki node arasinda yol bulabilir
+- weighted matrix uzerinde maliyet bazli en iyi yolu bulabilir
 - graph uzerinde basit sinyal yayilimi hesaplayabilir
 - deterministic random walk profili uretebilir
 - source-target traffic / flow ozeti cikarabilir
@@ -248,8 +253,11 @@ Bu DSL ile kullanici:
 - centrality profili cikarabilir
 - closeness profili cikarabilir
 - policy-guided walk tanimlayabilir
+- weighted edge-aware walk tanimlayabilir
 - star benzeri motifleri tespit edebilir
 - square benzeri motifleri tespit edebilir
+- weighted matrix ustunde threshold / band / nonzero activation kurallari tanimlayabilir
+- ayni graph primitive'ini farkli edge activation semantikleriyle yeniden kullanabilir
 - ara heuristic gorunumleri yaratabilir
 
 ### 8. Reusable Block / Subgraph
@@ -390,10 +398,14 @@ Bu demo su akisi tasir:
 22. `policy_walk` ile yonlendirilmis walk profili uret
 23. `star_patterns` ile star benzeri motifleri bul
 24. `square_patterns` ile square benzeri motifleri bul
-25. formul ile `heuristic_score` hesapla
-26. expression ile `search_mode` sec
-27. `condition` ile branch sec
-28. parameterized subgraph ile strategy object uret
+25. weighted matrix icin band-threshold komsuluk profili uret
+26. weighted matrix icin thresholded degree view uret
+27. weighted matrix icin activated edge pair listesi uret
+28. weighted matrix icin strong-edge path profili uret
+29. formul ile `heuristic_score` hesapla
+30. expression ile `search_mode` sec
+31. `condition` ile branch sec
+32. parameterized subgraph ile strategy object uret
 
 Bu demo bugun su seyi kanitliyor:
 
@@ -405,6 +417,7 @@ Bu demo bugun su seyi kanitliyor:
 - random walk, traffic/flow ve basit motif tespitini de ifade edebiliyoruz
 - centrality ve policy-guided walk mantigini da ifade edebiliyoruz
 - ikinci merkezilik ailesi ve ikinci motif ailesi de geldi
+- weighted edge activation semantiklerini de expression katmanina soktuk
 - matematiksel formula yazabiliyoruz
 - reusable heuristic block cagirabiliyoruz
 
@@ -572,10 +585,11 @@ Bugunden sonra teknik olarak en mantikli yakin rota su:
 3. flow / walk / graph pattern primitive'lerini buyutmek
 4. centrality / motif ailelerini buyutmek
 5. walk policy seceneklerini buyutmek
-6. operator compatibility kurallarini daha akilli hale getirmek
-7. stronger definition contract
-8. CLI tabanli authoring / inspect tooling
-9. sonra UI prototipi
+6. weighted edge scoring ve cost-aware path primitive'lerini derinlestirmek
+7. operator compatibility kurallarini daha akilli hale getirmek
+8. stronger definition contract
+9. CLI tabanli authoring / inspect tooling
+10. sonra UI prototipi
 
 ## Milestone Mantigi
 
@@ -622,19 +636,18 @@ Su anki calisan capability listesi:
 - walk / flow / triangle pattern transforms
 - centrality / policy walk / star pattern transforms
 - closeness / square pattern transforms
+- weighted edge activation rules
+- weighted cost-aware path primitive'leri
 - parameterized subgraph
 - contract export
 - compatibility output
 
 En mantikli bir sonraki teknik hedef:
 
-- graph-specific transforms
-- cluster / neighborhood transforms
-- graph pattern primitive'leri
-- path / propagation primitive'leri
-- walk / flow primitive'leri
-- centrality / policy primitive'leri
-- closeness / square motif primitive'leri
+- weighted edge scoring
+- weighted cost-aware shortest path
+- stronger walk policies that use edge weights
+- motif detection icin weighted variants
 - daha guclu reduce patterns
 
 Neden?
@@ -642,8 +655,8 @@ Neden?
 Cunku su an kullanici:
 
 - veri secip donusturebiliyor
-- ama graph yapisi, neighborhood iliskileri ve daha domain-specific search mechanics tarafini hala kisitli primitive'lerle ifade ediyor
-- path bulma ve basit propagation ilk versiyonuyla geldi
+- ama edge aktifligi ile edge maliyeti hala ayni sey degil; onu ayirmamiz gerekiyor
+- weighted graph tarafinda threshold activation geldi, sirada cost-aware ve score-aware search mechanics var
 - random walk, flow ve triangle pattern detection ilk versiyonuyla geldi
 - centrality, policy walk ve star motifleri ilk versiyonuyla geldi
 - closeness ve square motifleri de ilk versiyonuyla geldi

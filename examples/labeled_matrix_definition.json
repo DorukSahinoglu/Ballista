@@ -18,6 +18,21 @@
       }
     },
     {
+      "name": "weighted_affinity_matrix",
+      "kind": "matrix",
+      "representation": "weighted",
+      "default": [
+        [0.0, 0.82, 0.48, 0.77],
+        [0.35, 0.0, 0.91, 0.42],
+        [0.88, 0.73, 0.0, 0.95],
+        [0.18, 0.51, 0.86, 0.0]
+      ],
+      "metadata": {
+        "row_labels": ["alpha", "beta", "gamma", "delta"],
+        "semantic": "weighted attraction matrix"
+      }
+    },
+    {
       "name": "node_labels",
       "kind": "mapping",
       "representation": "tag_map",
@@ -141,6 +156,54 @@
       "kind": "object_collection",
       "representation": "square_pattern",
       "default": []
+    },
+    {
+      "name": "star_patterns",
+      "kind": "object_collection",
+      "representation": "star_pattern",
+      "default": []
+    },
+    {
+      "name": "weighted_band_neighbors",
+      "kind": "object_collection",
+      "representation": "weighted_neighbor_subset",
+      "default": []
+    },
+    {
+      "name": "weighted_degree_view",
+      "kind": "object_collection",
+      "representation": "weighted_degree_profile",
+      "default": []
+    },
+    {
+      "name": "activated_weighted_edges",
+      "kind": "object_collection",
+      "representation": "activated_edge_pairs",
+      "default": []
+    },
+    {
+      "name": "weighted_entry_to_explorer_path",
+      "kind": "object",
+      "representation": "weighted_path_profile",
+      "default": {}
+    },
+    {
+      "name": "weighted_cost_path",
+      "kind": "object",
+      "representation": "weighted_cost_path_profile",
+      "default": {}
+    },
+    {
+      "name": "weighted_edge_strengths",
+      "kind": "object_collection",
+      "representation": "weighted_edge_strength_profile",
+      "default": []
+    },
+    {
+      "name": "weighted_policy_walk",
+      "kind": "object",
+      "representation": "weighted_policy_walk_profile",
+      "default": {}
     },
     {
       "name": "ranked_priority_nodes",
@@ -606,6 +669,195 @@
       },
       {
         "type": "operator",
+        "name": "set_weighted_band_neighbors",
+        "operator": "set_slot_value",
+        "message": "weighted matrix filtered with a band activation rule",
+        "snapshot_keys": ["weighted_band_neighbors"],
+        "params": {
+          "slot": "weighted_band_neighbors",
+          "value": {
+            "$expr": {
+              "op": "neighbors_of",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "node_index": 2,
+              "activation": {
+                "mode": "between",
+                "min_value": 0.7,
+                "max_value": 0.9
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_weighted_degree_view",
+        "operator": "set_slot_value",
+        "message": "weighted matrix projected into a thresholded degree view",
+        "snapshot_keys": ["weighted_degree_view"],
+        "params": {
+          "slot": "weighted_degree_view",
+          "value": {
+            "$expr": {
+              "op": "matrix_degrees",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "activation": {
+                "mode": "gte",
+                "value": 0.75
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_activated_weighted_edges",
+        "operator": "set_slot_value",
+        "message": "weighted edges activated by threshold and collapsed into unique pairs",
+        "snapshot_keys": ["activated_weighted_edges"],
+        "params": {
+          "slot": "activated_weighted_edges",
+          "value": {
+            "$expr": {
+              "op": "edge_pairs",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "activation": {
+                "mode": "gte",
+                "value": 0.75
+              },
+              "directed": false
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_weighted_entry_to_explorer_path",
+        "operator": "set_slot_value",
+        "message": "weighted graph path resolved through strong-edge activation",
+        "snapshot_keys": ["weighted_entry_to_explorer_path"],
+        "params": {
+          "slot": "weighted_entry_to_explorer_path",
+          "value": {
+            "$expr": {
+              "op": "shortest_path",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "start_node_index": 0,
+              "target_node_index": 3,
+              "activation": {
+                "mode": "gte",
+                "value": 0.85
+              },
+              "undirected": true
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_weighted_cost_path",
+        "operator": "set_slot_value",
+        "message": "weighted graph path resolved with edge costs instead of hop count",
+        "snapshot_keys": ["weighted_cost_path"],
+        "params": {
+          "slot": "weighted_cost_path",
+          "value": {
+            "$expr": {
+              "op": "weighted_shortest_path",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "start_node_index": 0,
+              "target_node_index": 3,
+              "activation": {
+                "mode": "nonzero"
+              },
+              "undirected": true,
+              "cost_mode": "inverse_weight",
+              "cost_power": 1.0
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_weighted_edge_strengths",
+        "operator": "set_slot_value",
+        "message": "weighted edges ranked by strength",
+        "snapshot_keys": ["weighted_edge_strengths"],
+        "params": {
+          "slot": "weighted_edge_strengths",
+          "value": {
+            "$expr": {
+              "op": "edge_strength_profile",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "activation": {
+                "mode": "nonzero"
+              },
+              "directed": false
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
+        "name": "set_weighted_policy_walk",
+        "operator": "set_slot_value",
+        "message": "weighted walk advanced with edge-aware policy",
+        "snapshot_keys": ["weighted_policy_walk"],
+        "params": {
+          "slot": "weighted_policy_walk",
+          "value": {
+            "$expr": {
+              "op": "weighted_policy_walk",
+              "source": {
+                "$ref": "slots.weighted_affinity_matrix"
+              },
+              "labels": {
+                "$ref": "slots.node_labels"
+              },
+              "start_node_index": 0,
+              "steps": 4,
+              "activation": {
+                "mode": "nonzero"
+              },
+              "undirected": true,
+              "policy": "prefer_unvisited_strong",
+              "cost_mode": "inverse_weight"
+            }
+          }
+        }
+      },
+      {
+        "type": "operator",
         "name": "set_priority_nodes",
         "operator": "set_slot_value",
         "message": "priority subset derived with filter and map transforms",
@@ -852,7 +1104,7 @@
         "name": "set_heuristic_score",
         "operator": "set_slot_value",
         "message": "heuristic score computed from a mathematical formula",
-        "snapshot_keys": ["heuristic_score", "degree_view", "critical_neighbors", "connected_components", "edge_pairs", "critical_entry_overlap", "critical_reach", "entry_to_explorer_path", "critical_signal_profile", "critical_random_walk", "entry_flow_profile", "triangle_patterns", "centrality_profile", "closeness_profile", "critical_policy_walk", "square_patterns", "star_patterns", "priority_nodes", "ranked_priority_nodes", "priority_summary", "window_profiles"],
+        "snapshot_keys": ["heuristic_score", "degree_view", "critical_neighbors", "connected_components", "edge_pairs", "critical_entry_overlap", "critical_reach", "entry_to_explorer_path", "critical_signal_profile", "critical_random_walk", "entry_flow_profile", "triangle_patterns", "centrality_profile", "closeness_profile", "critical_policy_walk", "square_patterns", "star_patterns", "weighted_band_neighbors", "weighted_degree_view", "activated_weighted_edges", "weighted_entry_to_explorer_path", "weighted_cost_path", "weighted_edge_strengths", "weighted_policy_walk", "priority_nodes", "ranked_priority_nodes", "priority_summary", "window_profiles"],
         "params": {
           "slot": "heuristic_score",
           "value": {
@@ -1068,6 +1320,107 @@
                         }
                       },
                       0.9
+                    ]
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "len",
+                        "value": {
+                          "$ref": "slots.activated_weighted_edges"
+                        }
+                      },
+                      0.35
+                    ]
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "ref",
+                        "path": "slots.weighted_degree_view.2.total_edge_weight"
+                      },
+                      0.4
+                    ]
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "sum",
+                        "source": {
+                          "$ref": "slots.weighted_band_neighbors"
+                        },
+                        "as": "item",
+                        "value": {
+                          "op": "ref",
+                          "path": "vars.item.edge_value"
+                        }
+                      },
+                      0.25
+                    ]
+                  },
+                  {
+                    "op": "if",
+                    "condition": {
+                      "op": "ref",
+                      "path": "slots.weighted_entry_to_explorer_path.reachable"
+                    },
+                    "then": 0.95,
+                    "else": 0
+                  },
+                  {
+                    "op": "if",
+                    "condition": {
+                      "op": "ref",
+                      "path": "slots.weighted_cost_path.reachable"
+                    },
+                    "then": {
+                      "op": "div",
+                      "left": 1.4,
+                      "right": {
+                        "op": "ref",
+                        "path": "slots.weighted_cost_path.total_cost"
+                      }
+                    },
+                    "else": 0
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "ref",
+                        "path": "slots.weighted_edge_strengths.0.strength"
+                      },
+                      0.45
+                    ]
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "ref",
+                        "path": "slots.weighted_policy_walk.unique_visits"
+                      },
+                      0.3
+                    ]
+                  },
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "sum",
+                        "source": {
+                          "$ref": "slots.weighted_policy_walk.traversed_weights"
+                        },
+                        "as": "item",
+                        "value": {
+                          "op": "ref",
+                          "path": "vars.item"
+                        }
+                      },
+                      0.18
                     ]
                   },
                   {

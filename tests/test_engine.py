@@ -1101,6 +1101,236 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(result.get("next_strategy")["primary_weight"], 0.9)
         self.assertEqual(result.get_slot_definition("affinity_matrix").kind, "matrix")
 
+    def test_graph_expressions_support_weighted_activation_rules(self) -> None:
+        definition = {
+            "name": "weighted_activation_definition",
+            "slot_definitions": [
+                {
+                    "name": "weighted_affinity_matrix",
+                    "kind": "matrix",
+                    "representation": "weighted",
+                    "default": [
+                        [0.0, 0.85, 0.15],
+                        [0.2, 0.0, 0.92],
+                        [0.88, 0.74, 0.0],
+                    ],
+                },
+                {
+                    "name": "node_labels",
+                    "kind": "mapping",
+                    "representation": "tag_map",
+                    "default": {"0": "entry", "1": "support", "2": "critical"},
+                },
+                {
+                    "name": "weighted_band_neighbors",
+                    "kind": "object_collection",
+                    "representation": "weighted_neighbor_subset",
+                    "default": [],
+                },
+                {
+                    "name": "weighted_degree_view",
+                    "kind": "object_collection",
+                    "representation": "weighted_degree_profile",
+                    "default": [],
+                },
+                {
+                    "name": "activated_weighted_edges",
+                    "kind": "object_collection",
+                    "representation": "activated_edge_pairs",
+                    "default": [],
+                },
+                {
+                    "name": "weighted_path",
+                    "kind": "object",
+                    "representation": "weighted_path_profile",
+                    "default": {},
+                },
+                {
+                    "name": "weighted_cost_path",
+                    "kind": "object",
+                    "representation": "weighted_cost_path_profile",
+                    "default": {},
+                },
+                {
+                    "name": "weighted_edge_strengths",
+                    "kind": "object_collection",
+                    "representation": "weighted_edge_strength_profile",
+                    "default": [],
+                },
+                {
+                    "name": "weighted_policy_walk",
+                    "kind": "object",
+                    "representation": "weighted_policy_walk_profile",
+                    "default": {},
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_weighted_band_neighbors",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "weighted_band_neighbors",
+                            "value": {
+                                "$expr": {
+                                    "op": "neighbors_of",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "node_index": 2,
+                                    "activation": {
+                                        "mode": "between",
+                                        "min_value": 0.7,
+                                        "max_value": 0.9,
+                                    },
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_weighted_degree_view",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "weighted_degree_view",
+                            "value": {
+                                "$expr": {
+                                    "op": "matrix_degrees",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "activation": {"mode": "gte", "value": 0.75},
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_activated_weighted_edges",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "activated_weighted_edges",
+                            "value": {
+                                "$expr": {
+                                    "op": "edge_pairs",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "activation": {"mode": "gte", "value": 0.75},
+                                    "directed": False,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_weighted_path",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "weighted_path",
+                            "value": {
+                                "$expr": {
+                                    "op": "shortest_path",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "start_node_index": 0,
+                                    "target_node_index": 2,
+                                    "activation": {"mode": "gte", "value": 0.85},
+                                    "undirected": True,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_weighted_cost_path",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "weighted_cost_path",
+                            "value": {
+                                "$expr": {
+                                    "op": "weighted_shortest_path",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "start_node_index": 0,
+                                    "target_node_index": 2,
+                                    "activation": {"mode": "nonzero"},
+                                    "undirected": False,
+                                    "cost_mode": "inverse_weight",
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_weighted_edge_strengths",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "weighted_edge_strengths",
+                            "value": {
+                                "$expr": {
+                                    "op": "edge_strength_profile",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "activation": {"mode": "nonzero"},
+                                    "directed": False,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_weighted_policy_walk",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "weighted_policy_walk",
+                            "value": {
+                                "$expr": {
+                                    "op": "weighted_policy_walk",
+                                    "source": {"$ref": "slots.weighted_affinity_matrix"},
+                                    "labels": {"$ref": "slots.node_labels"},
+                                    "start_node_index": 0,
+                                    "steps": 3,
+                                    "activation": {"mode": "nonzero"},
+                                    "undirected": False,
+                                    "policy": "prefer_strongest",
+                                    "cost_mode": "inverse_weight",
+                                }
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(len(result.get("weighted_band_neighbors")), 2)
+        self.assertEqual(result.get("weighted_band_neighbors")[0]["label"], "entry")
+        self.assertAlmostEqual(result.get("weighted_band_neighbors")[0]["edge_value"], 0.88)
+        self.assertEqual(result.get("weighted_band_neighbors")[1]["label"], "support")
+        self.assertEqual(len(result.get("weighted_degree_view")), 3)
+        self.assertEqual(result.get("weighted_degree_view")[0]["degree"], 1)
+        self.assertAlmostEqual(result.get("weighted_degree_view")[0]["total_edge_weight"], 0.85)
+        self.assertAlmostEqual(result.get("weighted_degree_view")[1]["avg_edge_weight"], 0.92)
+        self.assertEqual(len(result.get("activated_weighted_edges")), 3)
+        self.assertTrue(result.get("weighted_path")["reachable"])
+        self.assertEqual(result.get("weighted_path")["length"], 1)
+        self.assertTrue(result.get("weighted_cost_path")["reachable"])
+        self.assertEqual(result.get("weighted_cost_path")["node_ids"], [0, 1, 2])
+        self.assertAlmostEqual(result.get("weighted_cost_path")["total_cost"], 2.263427, places=6)
+        self.assertEqual(len(result.get("weighted_cost_path")["edge_costs"]), 2)
+        self.assertEqual(result.get("weighted_edge_strengths")[0]["strength"], 0.92)
+        self.assertEqual(result.get("weighted_edge_strengths")[0]["source_id"], 1)
+        self.assertEqual([item["node_id"] for item in result.get("weighted_policy_walk")["trace"]], [0, 1, 2, 0])
+        self.assertAlmostEqual(result.get("weighted_policy_walk")["total_cost"], 3.399791, places=6)
+        self.assertEqual(result.get("weighted_policy_walk")["unique_visits"], 3)
+
     def test_validator_reports_unknown_subgraph_reference(self) -> None:
         invalid_definition = {
             "name": "invalid_subgraph_definition",
@@ -1238,6 +1468,9 @@ class EngineTests(unittest.TestCase):
         self.assertIn("flow_profile", contract["supported_expression_operators"])
         self.assertIn("centrality_profile", contract["supported_expression_operators"])
         self.assertIn("closeness_profile", contract["supported_expression_operators"])
+        self.assertIn("edge_strength_profile", contract["supported_expression_operators"])
+        self.assertIn("weighted_policy_walk", contract["supported_expression_operators"])
+        self.assertIn("weighted_shortest_path", contract["supported_expression_operators"])
 
 
 if __name__ == "__main__":

@@ -646,7 +646,7 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self"):
+        for key in ("labels", "active_value", "activation", "include_self"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -662,7 +662,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self"):
+        for key in ("labels", "active_value", "activation", "include_self"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -678,7 +678,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -694,7 +694,23 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "directed"):
+        for key in ("labels", "active_value", "activation", "include_self", "directed"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "edge_strength_profile":
+        if "source" not in expression:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.source",
+                    message="Expression edge_strength_profile requires 'source'",
+                )
+            )
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("labels", "active_value", "activation", "include_self", "directed"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -711,7 +727,7 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self"):
+        for key in ("labels", "active_value", "activation", "include_self"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -728,7 +744,7 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected", "include_start"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected", "include_start"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -745,7 +761,24 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "weighted_shortest_path":
+        for key in ("source", "start_node_index", "target_node_index"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression weighted_shortest_path requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "activation", "include_self", "undirected", "cost_mode", "cost_power"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -765,6 +798,7 @@ def _validate_expression(
         for key in (
             "labels",
             "active_value",
+            "activation",
             "include_self",
             "undirected",
             "decay",
@@ -786,7 +820,7 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected", "seed"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected", "seed"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -803,7 +837,7 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -819,7 +853,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self"):
+        for key in ("labels", "active_value", "activation", "include_self"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -835,7 +869,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -851,7 +885,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -868,7 +902,24 @@ def _validate_expression(
                 continue
             _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected", "policy"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected", "policy"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "weighted_policy_walk":
+        for key in ("source", "start_node_index", "steps"):
+            if key not in expression:
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.{key}",
+                        message=f"Expression weighted_policy_walk requires '{key}'",
+                    )
+                )
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+
+        for key in ("labels", "active_value", "activation", "include_self", "undirected", "policy", "cost_mode", "cost_power"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -884,7 +935,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self", "undirected", "min_degree", "max_leaf_degree"):
+        for key in ("labels", "active_value", "activation", "include_self", "undirected", "min_degree", "max_leaf_degree"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
@@ -900,7 +951,7 @@ def _validate_expression(
         else:
             _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
 
-        for key in ("labels", "active_value", "include_self"):
+        for key in ("labels", "active_value", "activation", "include_self"):
             if key in expression:
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return

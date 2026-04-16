@@ -44,9 +44,11 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "matrix_degrees",
     "connected_components",
     "edge_pairs",
+    "edge_strength_profile",
     "neighborhood_overlap",
     "reachable_within",
     "shortest_path",
+    "weighted_shortest_path",
     "propagate_signal",
     "random_walk",
     "flow_profile",
@@ -54,6 +56,7 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "centrality_profile",
     "closeness_profile",
     "policy_walk",
+    "weighted_policy_walk",
     "star_patterns",
     "square_patterns",
 }
@@ -205,6 +208,7 @@ def evaluate_expression(
         node_index = int(_eval_operand(expression["node_index"], context, scope))
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
 
         _ensure_matrix(matrix, "neighbors_of")
@@ -213,6 +217,7 @@ def evaluate_expression(
             node_index=node_index,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
         )
 
@@ -220,6 +225,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
 
         _ensure_matrix(matrix, "matrix_degrees")
@@ -231,13 +237,17 @@ def evaluate_expression(
                 node_index=node_index,
                 labels=labels,
                 active_value=active_value,
+                activation=activation,
                 include_self=include_self,
             )
+            total_edge_weight = round(_sum_numeric_edge_values(neighbors), 6)
             degree_view.append(
                 {
                     "node_id": node_index,
                     "label": _resolve_label(labels, node_index),
                     "degree": len(neighbors),
+                    "total_edge_weight": total_edge_weight,
+                    "avg_edge_weight": 0.0 if not neighbors else round(total_edge_weight / len(neighbors), 6),
                     "neighbors": neighbors,
                 }
             )
@@ -247,6 +257,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
 
@@ -255,6 +266,7 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
         )
@@ -263,6 +275,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         directed = bool(_eval_operand(expression.get("directed", False), context, scope))
 
@@ -271,6 +284,25 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
+            include_self=include_self,
+            directed=directed,
+        )
+
+    if operator == "edge_strength_profile":
+        matrix = _eval_operand(expression["source"], context, scope)
+        labels = _eval_operand(expression.get("labels"), context, scope)
+        active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
+        include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
+        directed = bool(_eval_operand(expression.get("directed", False), context, scope))
+
+        _ensure_matrix(matrix, "edge_strength_profile")
+        return _build_edge_strength_profile(
+            matrix=matrix,
+            labels=labels,
+            active_value=active_value,
+            activation=activation,
             include_self=include_self,
             directed=directed,
         )
@@ -281,6 +313,7 @@ def evaluate_expression(
         left_node_index = int(_eval_operand(expression["left_node_index"], context, scope))
         right_node_index = int(_eval_operand(expression["right_node_index"], context, scope))
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
 
         _ensure_matrix(matrix, "neighborhood_overlap")
@@ -289,6 +322,7 @@ def evaluate_expression(
             node_index=left_node_index,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
         )
         right_neighbors = _build_neighbor_objects(
@@ -296,6 +330,7 @@ def evaluate_expression(
             node_index=right_node_index,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
         )
         left_ids = {item["node_id"] for item in left_neighbors}
@@ -324,6 +359,7 @@ def evaluate_expression(
         start_node_index = int(_eval_operand(expression["start_node_index"], context, scope))
         max_depth = int(_eval_operand(expression["max_depth"], context, scope))
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
         include_start = bool(_eval_operand(expression.get("include_start", False), context, scope))
@@ -335,6 +371,7 @@ def evaluate_expression(
             start_node_index=start_node_index,
             max_depth=max_depth,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
             include_start=include_start,
@@ -346,6 +383,7 @@ def evaluate_expression(
         start_node_index = int(_eval_operand(expression["start_node_index"], context, scope))
         target_node_index = int(_eval_operand(expression["target_node_index"], context, scope))
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
 
@@ -356,8 +394,35 @@ def evaluate_expression(
             start_node_index=start_node_index,
             target_node_index=target_node_index,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
+        )
+
+    if operator == "weighted_shortest_path":
+        matrix = _eval_operand(expression["source"], context, scope)
+        labels = _eval_operand(expression.get("labels"), context, scope)
+        start_node_index = int(_eval_operand(expression["start_node_index"], context, scope))
+        target_node_index = int(_eval_operand(expression["target_node_index"], context, scope))
+        active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
+        include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
+        undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
+        cost_mode = str(_eval_operand(expression.get("cost_mode", "inverse_weight"), context, scope))
+        cost_power = float(_eval_operand(expression.get("cost_power", 1.0), context, scope))
+
+        _ensure_matrix(matrix, "weighted_shortest_path")
+        return _build_weighted_shortest_path(
+            matrix=matrix,
+            labels=labels,
+            start_node_index=start_node_index,
+            target_node_index=target_node_index,
+            active_value=active_value,
+            activation=activation,
+            include_self=include_self,
+            undirected=undirected,
+            cost_mode=cost_mode,
+            cost_power=cost_power,
         )
 
     if operator == "propagate_signal":
@@ -366,6 +431,7 @@ def evaluate_expression(
         seed_nodes = _eval_operand(expression["seed_nodes"], context, scope)
         steps = int(_eval_operand(expression["steps"], context, scope))
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
         decay = float(_eval_operand(expression.get("decay", 0.5), context, scope))
@@ -378,6 +444,7 @@ def evaluate_expression(
             seed_nodes=seed_nodes,
             steps=steps,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
             decay=decay,
@@ -390,6 +457,7 @@ def evaluate_expression(
         start_node_index = int(_eval_operand(expression["start_node_index"], context, scope))
         steps = int(_eval_operand(expression["steps"], context, scope))
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
         seed = int(_eval_operand(expression.get("seed", 0), context, scope))
@@ -401,6 +469,7 @@ def evaluate_expression(
             start_node_index=start_node_index,
             steps=steps,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
             seed=seed,
@@ -412,6 +481,7 @@ def evaluate_expression(
         source_nodes = _eval_operand(expression["source_nodes"], context, scope)
         target_nodes = _eval_operand(expression["target_nodes"], context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
 
@@ -422,6 +492,7 @@ def evaluate_expression(
             source_nodes=source_nodes,
             target_nodes=target_nodes,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
         )
@@ -430,6 +501,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
 
         _ensure_matrix(matrix, "triangle_patterns")
@@ -437,6 +509,7 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
         )
 
@@ -444,6 +517,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
 
@@ -452,6 +526,7 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
         )
@@ -460,6 +535,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
 
@@ -468,6 +544,7 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
         )
@@ -478,6 +555,7 @@ def evaluate_expression(
         start_node_index = int(_eval_operand(expression["start_node_index"], context, scope))
         steps = int(_eval_operand(expression["steps"], context, scope))
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
         policy = str(_eval_operand(expression.get("policy", "prefer_unvisited"), context, scope))
@@ -489,15 +567,45 @@ def evaluate_expression(
             start_node_index=start_node_index,
             steps=steps,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
             policy=policy,
+        )
+
+    if operator == "weighted_policy_walk":
+        matrix = _eval_operand(expression["source"], context, scope)
+        labels = _eval_operand(expression.get("labels"), context, scope)
+        start_node_index = int(_eval_operand(expression["start_node_index"], context, scope))
+        steps = int(_eval_operand(expression["steps"], context, scope))
+        active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
+        include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
+        undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
+        policy = str(_eval_operand(expression.get("policy", "prefer_strongest"), context, scope))
+        cost_mode = str(_eval_operand(expression.get("cost_mode", "inverse_weight"), context, scope))
+        cost_power = float(_eval_operand(expression.get("cost_power", 1.0), context, scope))
+
+        _ensure_matrix(matrix, "weighted_policy_walk")
+        return _build_weighted_policy_walk(
+            matrix=matrix,
+            labels=labels,
+            start_node_index=start_node_index,
+            steps=steps,
+            active_value=active_value,
+            activation=activation,
+            include_self=include_self,
+            undirected=undirected,
+            policy=policy,
+            cost_mode=cost_mode,
+            cost_power=cost_power,
         )
 
     if operator == "star_patterns":
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
         undirected = bool(_eval_operand(expression.get("undirected", True), context, scope))
         min_degree = int(_eval_operand(expression.get("min_degree", 3), context, scope))
@@ -508,6 +616,7 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
             undirected=undirected,
             min_degree=min_degree,
@@ -518,6 +627,7 @@ def evaluate_expression(
         matrix = _eval_operand(expression["source"], context, scope)
         labels = _eval_operand(expression.get("labels"), context, scope)
         active_value = _eval_operand(expression.get("active_value", 1), context, scope)
+        activation = _eval_operand(expression.get("activation"), context, scope)
         include_self = bool(_eval_operand(expression.get("include_self", False), context, scope))
 
         _ensure_matrix(matrix, "square_patterns")
@@ -525,6 +635,7 @@ def evaluate_expression(
             matrix=matrix,
             labels=labels,
             active_value=active_value,
+            activation=activation,
             include_self=include_self,
         )
 
@@ -706,6 +817,7 @@ def _build_neighbor_objects(
     node_index: int,
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
 ) -> list[dict[str, Any]]:
     if node_index < 0 or node_index >= len(matrix):
@@ -713,7 +825,7 @@ def _build_neighbor_objects(
 
     neighbors = []
     for target_index, edge_value in enumerate(matrix[node_index]):
-        if edge_value != active_value:
+        if not _is_edge_active(edge_value, active_value, activation):
             continue
         if not include_self and target_index == node_index:
             continue
@@ -731,6 +843,7 @@ def _build_edge_pairs(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     directed: bool,
 ) -> list[dict[str, Any]]:
@@ -739,7 +852,7 @@ def _build_edge_pairs(
 
     for source_index, row in enumerate(matrix):
         for target_index, edge_value in enumerate(row):
-            if edge_value != active_value:
+            if not _is_edge_active(edge_value, active_value, activation):
                 continue
             if not include_self and source_index == target_index:
                 continue
@@ -764,16 +877,41 @@ def _build_edge_pairs(
     return edges
 
 
+def _build_edge_strength_profile(
+    matrix: list[list[Any]],
+    labels: Any,
+    active_value: Any,
+    activation: dict[str, Any] | None,
+    include_self: bool,
+    directed: bool,
+) -> list[dict[str, Any]]:
+    profile = _build_edge_pairs(
+        matrix=matrix,
+        labels=labels,
+        active_value=active_value,
+        activation=activation,
+        include_self=include_self,
+        directed=directed,
+    )
+    for item in profile:
+        edge_value = item["edge_value"]
+        item["strength"] = float(edge_value) if isinstance(edge_value, (int, float)) and not isinstance(edge_value, bool) else 0.0
+    profile.sort(key=lambda item: (-item["strength"], item["source_id"], item["target_id"]))
+    return profile
+
+
 def _build_connected_components(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
 ) -> list[dict[str, Any]]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -813,13 +951,14 @@ def _build_connected_components(
 def _build_adjacency(
     matrix: list[list[Any]],
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
 ) -> dict[int, set[int]]:
     adjacency = {index: set() for index in range(len(matrix))}
     for source_index, row in enumerate(matrix):
         for target_index, edge_value in enumerate(row):
-            if edge_value != active_value:
+            if not _is_edge_active(edge_value, active_value, activation):
                 continue
             if not include_self and source_index == target_index:
                 continue
@@ -829,12 +968,68 @@ def _build_adjacency(
     return adjacency
 
 
+def _build_weighted_adjacency(
+    matrix: list[list[Any]],
+    active_value: Any,
+    activation: dict[str, Any] | None,
+    include_self: bool,
+    undirected: bool,
+    cost_mode: str,
+    cost_power: float,
+) -> dict[int, dict[int, float]]:
+    adjacency = {index: {} for index in range(len(matrix))}
+    for source_index, row in enumerate(matrix):
+        for target_index, edge_value in enumerate(row):
+            if not _is_edge_active(edge_value, active_value, activation):
+                continue
+            if not include_self and source_index == target_index:
+                continue
+
+            cost = _edge_value_to_cost(edge_value, cost_mode, cost_power)
+            existing_cost = adjacency[source_index].get(target_index)
+            if existing_cost is None or cost < existing_cost:
+                adjacency[source_index][target_index] = cost
+
+            if undirected:
+                reverse_existing_cost = adjacency[target_index].get(source_index)
+                if reverse_existing_cost is None or cost < reverse_existing_cost:
+                    adjacency[target_index][source_index] = cost
+    return adjacency
+
+
+def _build_weighted_value_adjacency(
+    matrix: list[list[Any]],
+    active_value: Any,
+    activation: dict[str, Any] | None,
+    include_self: bool,
+    undirected: bool,
+) -> dict[int, dict[int, float]]:
+    adjacency = {index: {} for index in range(len(matrix))}
+    for source_index, row in enumerate(matrix):
+        for target_index, edge_value in enumerate(row):
+            if not _is_edge_active(edge_value, active_value, activation):
+                continue
+            if not include_self and source_index == target_index:
+                continue
+            weight = _coerce_numeric_value(edge_value, "edge value")
+            existing_weight = adjacency[source_index].get(target_index)
+            if existing_weight is None or weight > existing_weight:
+                adjacency[source_index][target_index] = weight
+
+            if undirected:
+                reverse_existing_weight = adjacency[target_index].get(source_index)
+                if reverse_existing_weight is None or weight > reverse_existing_weight:
+                    adjacency[target_index][source_index] = weight
+    return adjacency
+
+
 def _build_reachable_within(
     matrix: list[list[Any]],
     labels: Any,
     start_node_index: int,
     max_depth: int,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
     include_start: bool,
@@ -842,6 +1037,7 @@ def _build_reachable_within(
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -884,12 +1080,14 @@ def _build_shortest_path(
     start_node_index: int,
     target_node_index: int,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
 ) -> dict[str, Any]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -921,12 +1119,69 @@ def _build_shortest_path(
     }
 
 
+def _build_weighted_shortest_path(
+    matrix: list[list[Any]],
+    labels: Any,
+    start_node_index: int,
+    target_node_index: int,
+    active_value: Any,
+    activation: dict[str, Any] | None,
+    include_self: bool,
+    undirected: bool,
+    cost_mode: str,
+    cost_power: float,
+) -> dict[str, Any]:
+    weighted_adjacency = _build_weighted_adjacency(
+        matrix=matrix,
+        active_value=active_value,
+        activation=activation,
+        include_self=include_self,
+        undirected=undirected,
+        cost_mode=cost_mode,
+        cost_power=cost_power,
+    )
+    _validate_node_index(start_node_index, matrix)
+    _validate_node_index(target_node_index, matrix)
+
+    path_result = _find_weighted_shortest_path(weighted_adjacency, start_node_index, target_node_index)
+    if path_result is None:
+        return {
+            "start_node_id": start_node_index,
+            "start_label": _resolve_label(labels, start_node_index),
+            "target_node_id": target_node_index,
+            "target_label": _resolve_label(labels, target_node_index),
+            "reachable": False,
+            "length": None,
+            "total_cost": None,
+            "node_ids": [],
+            "labels": [],
+            "edge_costs": [],
+            "cost_mode": cost_mode,
+        }
+
+    path_node_ids, total_cost, edge_costs = path_result
+    return {
+        "start_node_id": start_node_index,
+        "start_label": _resolve_label(labels, start_node_index),
+        "target_node_id": target_node_index,
+        "target_label": _resolve_label(labels, target_node_index),
+        "reachable": True,
+        "length": len(path_node_ids) - 1,
+        "total_cost": round(total_cost, 6),
+        "node_ids": path_node_ids,
+        "labels": [_resolve_label(labels, index) for index in path_node_ids],
+        "edge_costs": [round(cost, 6) for cost in edge_costs],
+        "cost_mode": cost_mode,
+    }
+
+
 def _build_signal_profile(
     matrix: list[list[Any]],
     labels: Any,
     seed_nodes: Any,
     steps: int,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
     decay: float,
@@ -935,6 +1190,7 @@ def _build_signal_profile(
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -993,6 +1249,7 @@ def _build_random_walk(
     start_node_index: int,
     steps: int,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
     seed: int,
@@ -1000,6 +1257,7 @@ def _build_random_walk(
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -1047,12 +1305,14 @@ def _build_flow_profile(
     source_nodes: Any,
     target_nodes: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
 ) -> dict[str, Any]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -1130,11 +1390,13 @@ def _build_triangle_patterns(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
 ) -> list[dict[str, Any]]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=True,
     )
@@ -1186,16 +1448,63 @@ def _find_shortest_path_node_ids(
     return path_node_ids
 
 
+def _find_weighted_shortest_path(
+    adjacency: dict[int, dict[int, float]],
+    start_node_index: int,
+    target_node_index: int,
+) -> tuple[list[int], float, list[float]] | None:
+    frontier: list[tuple[float, int]] = [(0.0, start_node_index)]
+    distances: dict[int, float] = {start_node_index: 0.0}
+    parents: dict[int, int | None] = {start_node_index: None}
+    edge_cost_to_node: dict[int, float] = {}
+
+    while frontier:
+        frontier.sort(key=lambda item: (item[0], item[1]))
+        current_cost, node_index = frontier.pop(0)
+        if current_cost > distances.get(node_index, float("inf")):
+            continue
+        if node_index == target_node_index:
+            break
+
+        for neighbor_index, edge_cost in sorted(adjacency[node_index].items()):
+            next_cost = current_cost + edge_cost
+            if next_cost >= distances.get(neighbor_index, float("inf")):
+                continue
+            distances[neighbor_index] = next_cost
+            parents[neighbor_index] = node_index
+            edge_cost_to_node[neighbor_index] = edge_cost
+            frontier.append((next_cost, neighbor_index))
+
+    if target_node_index not in distances:
+        return None
+
+    path_node_ids = []
+    edge_costs = []
+    cursor = target_node_index
+    while cursor is not None:
+        path_node_ids.append(cursor)
+        parent = parents[cursor]
+        if parent is not None:
+            edge_costs.append(edge_cost_to_node[cursor])
+        cursor = parent
+
+    path_node_ids.reverse()
+    edge_costs.reverse()
+    return path_node_ids, distances[target_node_index], edge_costs
+
+
 def _build_centrality_profile(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
 ) -> list[dict[str, Any]]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -1221,12 +1530,14 @@ def _build_closeness_profile(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
 ) -> list[dict[str, Any]]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -1260,6 +1571,7 @@ def _build_policy_walk(
     start_node_index: int,
     steps: int,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
     policy: str,
@@ -1267,6 +1579,7 @@ def _build_policy_walk(
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -1325,6 +1638,99 @@ def _build_policy_walk(
     }
 
 
+def _build_weighted_policy_walk(
+    matrix: list[list[Any]],
+    labels: Any,
+    start_node_index: int,
+    steps: int,
+    active_value: Any,
+    activation: dict[str, Any] | None,
+    include_self: bool,
+    undirected: bool,
+    policy: str,
+    cost_mode: str,
+    cost_power: float,
+) -> dict[str, Any]:
+    weight_adjacency = _build_weighted_value_adjacency(
+        matrix=matrix,
+        active_value=active_value,
+        activation=activation,
+        include_self=include_self,
+        undirected=undirected,
+    )
+    cost_adjacency = _build_weighted_adjacency(
+        matrix=matrix,
+        active_value=active_value,
+        activation=activation,
+        include_self=include_self,
+        undirected=undirected,
+        cost_mode=cost_mode,
+        cost_power=cost_power,
+    )
+    _validate_node_index(start_node_index, matrix)
+    if steps < 0:
+        raise ValueError("weighted_policy_walk expects steps >= 0")
+
+    supported_policies = {
+        "prefer_strongest",
+        "prefer_low_cost",
+        "prefer_unvisited_strong",
+    }
+    if policy not in supported_policies:
+        raise ValueError(f"Unsupported weighted_policy_walk policy '{policy}'")
+
+    current = start_node_index
+    trace = [current]
+    traversed_weights: list[float] = []
+    traversed_costs: list[float] = []
+    visit_counts = {current: 1}
+    stopped_early = False
+
+    for _ in range(steps):
+        neighbors = sorted(weight_adjacency[current])
+        if not neighbors:
+            stopped_early = True
+            break
+
+        next_node = _select_weighted_policy_walk_neighbor(
+            neighbors=neighbors,
+            weight_adjacency=weight_adjacency,
+            cost_adjacency=cost_adjacency,
+            current=current,
+            visit_counts=visit_counts,
+            policy=policy,
+        )
+        traversed_weights.append(weight_adjacency[current][next_node])
+        traversed_costs.append(cost_adjacency[current][next_node])
+        current = next_node
+        trace.append(current)
+        visit_counts[current] = visit_counts.get(current, 0) + 1
+
+    return {
+        "start_node_id": start_node_index,
+        "start_label": _resolve_label(labels, start_node_index),
+        "policy": policy,
+        "cost_mode": cost_mode,
+        "trace": [
+            {"node_id": node_index, "label": _resolve_label(labels, node_index)}
+            for node_index in trace
+        ],
+        "traversed_weights": [round(weight, 6) for weight in traversed_weights],
+        "traversed_costs": [round(cost, 6) for cost in traversed_costs],
+        "total_cost": round(sum(traversed_costs), 6),
+        "visit_counts": [
+            {
+                "node_id": node_index,
+                "label": _resolve_label(labels, node_index),
+                "count": count,
+            }
+            for node_index, count in sorted(visit_counts.items(), key=lambda item: (-item[1], item[0]))
+        ],
+        "unique_visits": len(visit_counts),
+        "stopped_early": stopped_early,
+    }
+
+
 def _select_policy_walk_neighbor(
     neighbors: list[int],
     adjacency: dict[int, set[int]],
@@ -1360,10 +1766,52 @@ def _select_policy_walk_neighbor(
     )
 
 
+def _select_weighted_policy_walk_neighbor(
+    neighbors: list[int],
+    weight_adjacency: dict[int, dict[int, float]],
+    cost_adjacency: dict[int, dict[int, float]],
+    current: int,
+    visit_counts: dict[int, int],
+    policy: str,
+) -> int:
+    if policy == "prefer_low_cost":
+        return min(
+            neighbors,
+            key=lambda item: (
+                cost_adjacency[current][item],
+                visit_counts.get(item, 0),
+                -weight_adjacency[current][item],
+                item,
+            ),
+        )
+
+    if policy == "prefer_unvisited_strong":
+        return min(
+            neighbors,
+            key=lambda item: (
+                visit_counts.get(item, 0) > 0,
+                -weight_adjacency[current][item],
+                cost_adjacency[current][item],
+                item,
+            ),
+        )
+
+    return min(
+        neighbors,
+        key=lambda item: (
+            -weight_adjacency[current][item],
+            visit_counts.get(item, 0),
+            cost_adjacency[current][item],
+            item,
+        ),
+    )
+
+
 def _build_star_patterns(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
     undirected: bool,
     min_degree: int,
@@ -1372,6 +1820,7 @@ def _build_star_patterns(
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=undirected,
     )
@@ -1408,11 +1857,13 @@ def _build_square_patterns(
     matrix: list[list[Any]],
     labels: Any,
     active_value: Any,
+    activation: dict[str, Any] | None,
     include_self: bool,
 ) -> list[dict[str, Any]]:
     adjacency = _build_adjacency(
         matrix=matrix,
         active_value=active_value,
+        activation=activation,
         include_self=include_self,
         undirected=True,
     )
@@ -1463,6 +1914,83 @@ def _breadth_first_distances(
             queue.append(neighbor_index)
 
     return distances
+
+
+def _is_edge_active(
+    edge_value: Any,
+    active_value: Any,
+    activation: dict[str, Any] | None,
+) -> bool:
+    if activation is None:
+        return edge_value == active_value
+
+    if not isinstance(activation, dict):
+        raise TypeError("Matrix activation must be an object")
+
+    mode = activation.get("mode", "equals")
+    if not isinstance(mode, str):
+        raise ValueError("Matrix activation mode must be a string")
+
+    if mode == "equals":
+        return edge_value == activation.get("value", active_value)
+
+    if mode == "nonzero":
+        return edge_value not in {0, 0.0, False, None}
+
+    numeric_edge_value = _coerce_numeric_value(edge_value, "edge value")
+
+    if mode in {"gt", "gte", "lt", "lte"}:
+        threshold = _coerce_numeric_value(activation.get("value"), "activation value")
+        comparisons = {
+            "gt": numeric_edge_value > threshold,
+            "gte": numeric_edge_value >= threshold,
+            "lt": numeric_edge_value < threshold,
+            "lte": numeric_edge_value <= threshold,
+        }
+        return comparisons[mode]
+
+    if mode == "between":
+        min_value = _coerce_numeric_value(activation.get("min_value"), "activation min_value")
+        max_value = _coerce_numeric_value(activation.get("max_value"), "activation max_value")
+        return min_value <= numeric_edge_value <= max_value
+
+    raise ValueError(f"Unsupported matrix activation mode '{mode}'")
+
+
+def _coerce_numeric_value(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{label} must be numeric")
+    return float(value)
+
+
+def _sum_numeric_edge_values(neighbors: list[dict[str, Any]]) -> float:
+    total = 0.0
+    for item in neighbors:
+        edge_value = item.get("edge_value")
+        if isinstance(edge_value, bool) or not isinstance(edge_value, (int, float)):
+            continue
+        total += float(edge_value)
+    return total
+
+
+def _edge_value_to_cost(
+    edge_value: Any,
+    cost_mode: str,
+    cost_power: float,
+) -> float:
+    numeric_edge_value = _coerce_numeric_value(edge_value, "edge value")
+    if cost_power <= 0:
+        raise ValueError("cost_power must be > 0")
+
+    if cost_mode == "inverse_weight":
+        if numeric_edge_value <= 0:
+            raise ValueError("inverse_weight cost mode requires positive edge values")
+        return 1.0 / (numeric_edge_value**cost_power)
+
+    if cost_mode == "direct_weight":
+        return numeric_edge_value**cost_power
+
+    raise ValueError(f"Unsupported weighted_shortest_path cost_mode '{cost_mode}'")
 
 
 def _build_closeness_score_map(adjacency: dict[int, set[int]]) -> dict[int, float]:
