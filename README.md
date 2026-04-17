@@ -86,6 +86,8 @@ Bugun olanlar:
 - parameterized subgraph var
 - editor contract / compatibility output var
 - transform operatorleri var
+- operator tabanli population search primitive'leri var
+- selection / recombination / acceptance primitive'leri var
 
 Bugun olmayanlar:
 
@@ -259,6 +261,26 @@ Bu DSL ile kullanici:
 - weighted matrix ustunde threshold / band / nonzero activation kurallari tanimlayabilir
 - ayni graph primitive'ini farkli edge activation semantikleriyle yeniden kullanabilir
 - ara heuristic gorunumleri yaratabilir
+- population tarafinda selection, recombination, mutation, acceptance ve restart policy'lerini degistirebilir
+
+Registry tarafinda da artik su tip population operatorleri var:
+
+- `select_top_population`
+- `select_population_batch`
+- `recombine_population`
+- `mutate_population`
+- `accept_population_candidates`
+- `restart_population`
+- `summarize_population`
+
+Bu population primitive'leri sadece klasik genetik algoritma icin dusunulmuyor.
+
+- evrimsel arama
+- population-based local search
+- restart'li constructive search
+- hybrid metaheuristic akislari
+
+gibi daha genel arama ailelerinde tekrar kullanilabilecek sekilde tasarlaniyor.
 
 ### 8. Reusable Block / Subgraph
 
@@ -310,9 +332,11 @@ src/ballista/
 examples/
   astro_definition.json
   labeled_matrix_definition.json
+  population_search_definition.json
   run_astro_demo.py
   run_definition_demo.py
   run_matrix_demo.py
+  run_population_demo.py
   run_contract_demo.py
 tests/
   test_engine.py
@@ -339,6 +363,13 @@ Matrix demo:
 ```powershell
 $env:PYTHONPATH="src"
 python examples/run_matrix_demo.py
+```
+
+Population demo:
+
+```powershell
+$env:PYTHONPATH="src"
+python examples/run_population_demo.py
 ```
 
 Contract demo:

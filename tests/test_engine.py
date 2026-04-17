@@ -1331,6 +1331,373 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.get("weighted_policy_walk")["total_cost"], 3.399791, places=6)
         self.assertEqual(result.get("weighted_policy_walk")["unique_visits"], 3)
 
+    def test_population_search_operators_support_selection_mutation_and_restart(self) -> None:
+        definition = {
+            "name": "population_search_definition",
+            "initial_slots": {
+                "rng_seed": 17,
+                "target": 2.75,
+                "target_score": 0.05,
+                "population_size": 8,
+            },
+            "slot_definitions": [
+                {
+                    "name": "population",
+                    "kind": "object_collection",
+                    "representation": "candidate_population",
+                    "default": [],
+                },
+                {
+                    "name": "elite_population",
+                    "kind": "object_collection",
+                    "representation": "elite_population",
+                    "default": [],
+                },
+                {
+                    "name": "mutated_population",
+                    "kind": "object_collection",
+                    "representation": "mutated_population",
+                    "default": [],
+                },
+                {
+                    "name": "population_summary",
+                    "kind": "object",
+                    "representation": "population_summary",
+                    "default": {},
+                },
+                {
+                    "name": "best",
+                    "kind": "object",
+                    "representation": "best_candidate",
+                    "default": {},
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "initialize_population",
+                        "operator": "initialize_population",
+                        "params": {"population_size": 8, "target": {"$ref": "slots.target"}},
+                    },
+                    {
+                        "type": "operator",
+                        "name": "summarize_initial_population",
+                        "operator": "summarize_population",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "output_slot": "population_summary",
+                            "best_output_slot": "best",
+                        },
+                    },
+                    {
+                        "type": "loop",
+                        "name": "optimization_loop",
+                        "max_iterations": 4,
+                        "body": {
+                            "type": "sequence",
+                            "name": "population_iteration",
+                            "steps": [
+                                {
+                                    "type": "operator",
+                                    "name": "select_top_population",
+                                    "operator": "select_top_population",
+                                    "params": {
+                                        "population": {"$ref": "slots.population"},
+                                        "selection_size": 3,
+                                        "output_slot": "elite_population",
+                                    },
+                                },
+                                {
+                                    "type": "operator",
+                                    "name": "mutate_population",
+                                    "operator": "mutate_population",
+                                    "params": {
+                                        "population": {"$ref": "slots.elite_population"},
+                                        "clones_per_candidate": 2,
+                                        "mutation_scale": 0.55,
+                                        "target": {"$ref": "slots.target"},
+                                        "output_slot": "mutated_population",
+                                    },
+                                },
+                                {
+                                    "type": "operator",
+                                    "name": "restart_population",
+                                    "operator": "restart_population",
+                                    "params": {
+                                        "elites": {"$ref": "slots.elite_population"},
+                                        "candidates": {"$ref": "slots.mutated_population"},
+                                        "target_population_size": 8,
+                                        "target": {"$ref": "slots.target"},
+                                        "min_position": -8.0,
+                                        "max_position": 8.0,
+                                        "restart_mode": "elite_biased",
+                                        "output_slot": "population",
+                                    },
+                                },
+                                {
+                                    "type": "operator",
+                                    "name": "summarize_population",
+                                    "operator": "summarize_population",
+                                    "params": {
+                                        "population": {"$ref": "slots.population"},
+                                        "output_slot": "population_summary",
+                                        "best_output_slot": "best",
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(len(result.get("population")), 8)
+        self.assertEqual(len(result.get("elite_population")), 3)
+        self.assertEqual(len(result.get("mutated_population")), 6)
+        self.assertEqual(result.get("population_summary")["population_size"], 8)
+        self.assertLess(result.get("population_summary")["best_score"], 1.0)
+        self.assertEqual(result.metrics.get("elite_population_size"), 3)
+        self.assertEqual(result.metrics.get("mutated_population_size"), 6)
+        self.assertEqual(result.metrics.get("restart_mode"), "elite_biased")
+        self.assertEqual(result.metrics.get("population_size"), 8)
+        self.assertEqual(result.get("best")["score"], result.metrics.get("best_score"))
+
+    def test_population_operators_support_selection_recombination_and_acceptance(self) -> None:
+        definition = {
+            "name": "selection_recombination_definition",
+            "initial_slots": {
+                "rng_seed": 19,
+                "target": 1.5,
+                "population_size": 6,
+            },
+            "slot_definitions": [
+                {
+                    "name": "population",
+                    "kind": "object_collection",
+                    "representation": "candidate_population",
+                    "default": [],
+                },
+                {
+                    "name": "selected_population",
+                    "kind": "object_collection",
+                    "representation": "selected_population",
+                    "default": [],
+                },
+                {
+                    "name": "recombined_population",
+                    "kind": "object_collection",
+                    "representation": "recombined_population",
+                    "default": [],
+                },
+                {
+                    "name": "mutated_population",
+                    "kind": "object_collection",
+                    "representation": "mutated_population",
+                    "default": [],
+                },
+                {
+                    "name": "accepted_population",
+                    "kind": "object_collection",
+                    "representation": "accepted_population",
+                    "default": [],
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "initialize_population",
+                        "operator": "initialize_population",
+                        "params": {"population_size": 6, "target": {"$ref": "slots.target"}},
+                    },
+                    {
+                        "type": "operator",
+                        "name": "select_population_batch",
+                        "operator": "select_population_batch",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "selection_size": 3,
+                            "selection_policy": "tournament",
+                            "tournament_size": 3,
+                            "output_slot": "selected_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "recombine_population",
+                        "operator": "recombine_population",
+                        "params": {
+                            "parents": {"$ref": "slots.selected_population"},
+                            "offspring_count": 4,
+                            "pairing_policy": "random",
+                            "blend_bias": 0.5,
+                            "jitter_scale": 0.1,
+                            "target": {"$ref": "slots.target"},
+                            "output_slot": "recombined_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "mutate_population",
+                        "operator": "mutate_population",
+                        "params": {
+                            "population": {"$ref": "slots.recombined_population"},
+                            "clones_per_candidate": 1,
+                            "mutation_scale": 0.2,
+                            "target": {"$ref": "slots.target"},
+                            "output_slot": "mutated_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "accept_population_candidates",
+                        "operator": "accept_population_candidates",
+                        "params": {
+                            "current_population": {"$ref": "slots.population"},
+                            "candidates": {"$ref": "slots.mutated_population"},
+                            "acceptance_policy": "best",
+                            "target_population_size": 5,
+                            "output_slot": "accepted_population",
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(len(result.get("selected_population")), 3)
+        self.assertEqual(len(result.get("recombined_population")), 4)
+        self.assertEqual(len(result.get("mutated_population")), 4)
+        self.assertEqual(len(result.get("accepted_population")), 5)
+        self.assertEqual(result.metrics.get("selection_policy"), "tournament")
+        self.assertEqual(result.metrics.get("recombined_population_size"), 4)
+        self.assertEqual(result.metrics.get("mutated_population_size"), 4)
+        self.assertEqual(result.metrics.get("acceptance_policy"), "best")
+        self.assertEqual(result.metrics.get("accepted_population_size"), 5)
+        accepted_scores = [item["score"] for item in result.get("accepted_population")]
+        self.assertEqual(accepted_scores, sorted(accepted_scores))
+
+    def test_population_operators_support_directional_recombination_and_diversity_acceptance(self) -> None:
+        definition = {
+            "name": "directional_population_definition",
+            "initial_slots": {
+                "target": 0.0,
+                "population": [
+                    {"position": 0.0, "mass": 1.0, "score": 0.0},
+                    {"position": 1.0, "mass": 1.0, "score": 1.0},
+                    {"position": 2.0, "mass": 1.0, "score": 2.0},
+                ],
+            },
+            "slot_definitions": [
+                {
+                    "name": "population",
+                    "kind": "object_collection",
+                    "representation": "candidate_population",
+                    "default": [],
+                },
+                {
+                    "name": "selected_population",
+                    "kind": "object_collection",
+                    "representation": "selected_population",
+                    "default": [],
+                },
+                {
+                    "name": "recombined_population",
+                    "kind": "object_collection",
+                    "representation": "recombined_population",
+                    "default": [],
+                },
+                {
+                    "name": "accepted_population",
+                    "kind": "object_collection",
+                    "representation": "accepted_population",
+                    "default": [],
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "select_population_batch",
+                        "operator": "select_population_batch",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "selection_size": 3,
+                            "selection_policy": "top",
+                            "output_slot": "selected_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "recombine_population",
+                        "operator": "recombine_population",
+                        "params": {
+                            "parents": {"$ref": "slots.selected_population"},
+                            "offspring_count": 3,
+                            "pairing_policy": "sequential",
+                            "recombination_policy": "directional",
+                            "directional_scale": 0.5,
+                            "jitter_scale": 0.0,
+                            "target": {"$ref": "slots.target"},
+                            "output_slot": "recombined_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "accept_population_candidates",
+                        "operator": "accept_population_candidates",
+                        "params": {
+                            "current_population": {"$ref": "slots.population"},
+                            "candidates": {"$ref": "slots.recombined_population"},
+                            "acceptance_policy": "diversity_guarded",
+                            "minimum_distance": 0.4,
+                            "target_population_size": 3,
+                            "output_slot": "accepted_population",
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        recombined = result.get("recombined_population")
+        accepted = result.get("accepted_population")
+
+        self.assertEqual([round(item["position"], 3) for item in recombined], [-0.5, 0.5, -1.0])
+        self.assertTrue(all(item["recombination_policy"] == "directional" for item in recombined))
+        self.assertEqual(len(accepted), 3)
+        self.assertEqual(result.metrics.get("recombination_policy"), "directional")
+        self.assertEqual(result.metrics.get("acceptance_policy"), "diversity_guarded")
+        for left_index, left in enumerate(accepted):
+            for right in accepted[left_index + 1 :]:
+                self.assertGreaterEqual(abs(left["position"] - right["position"]), 0.4)
+
     def test_validator_reports_unknown_subgraph_reference(self) -> None:
         invalid_definition = {
             "name": "invalid_subgraph_definition",
@@ -1460,6 +1827,13 @@ class EngineTests(unittest.TestCase):
         contract = export_registry_contract(build_builtin_registry())
         operator_names = [item["name"] for item in contract["operators"]]
         self.assertIn("construct_labeled_solution", operator_names)
+        self.assertIn("select_top_population", operator_names)
+        self.assertIn("select_population_batch", operator_names)
+        self.assertIn("mutate_population", operator_names)
+        self.assertIn("recombine_population", operator_names)
+        self.assertIn("restart_population", operator_names)
+        self.assertIn("accept_population_candidates", operator_names)
+        self.assertIn("summarize_population", operator_names)
         self.assertIn("supported_expression_operators", contract)
         self.assertIn("reduce", contract["supported_expression_operators"])
         self.assertIn("matrix_degrees", contract["supported_expression_operators"])
