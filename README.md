@@ -199,6 +199,8 @@ Bugun desteklenen operatorler:
 - `contains`, `in`
 - `add`, `sub`, `mul`, `div`, `pow`, `mod`
 - `abs`, `min`, `max`, `avg`, `round`
+- `clamp`, `lerp`
+- `metric_history`, `trend_profile`
 - `len`
 - `get`
 - `filter`
@@ -262,6 +264,9 @@ Bu DSL ile kullanici:
 - ayni graph primitive'ini farkli edge activation semantikleriyle yeniden kullanabilir
 - ara heuristic gorunumleri yaratabilir
 - population tarafinda selection, recombination, mutation, acceptance ve restart policy'lerini degistirebilir
+- iterasyona gore mutation scale, bias ve acceptance temperature gibi schedule parametreleri uretebilir
+- son iterasyonlardan metric hafizasi cikarip stagnation ve trend bilgisine gore policy degistirebilir
+- condition + subgraph ile trend'e gore farkli response block'larini cagirabilir
 
 Registry tarafinda da artik su tip population operatorleri var:
 
@@ -281,6 +286,15 @@ Bu population primitive'leri sadece klasik genetik algoritma icin dusunulmuyor.
 - hybrid metaheuristic akislari
 
 gibi daha genel arama ailelerinde tekrar kullanilabilecek sekilde tasarlaniyor.
+
+Su an bu primitive'ler icin:
+
+- `top`, `tournament`, `roulette`, `rank` selection policy'leri
+- birden fazla recombination policy
+- birden fazla acceptance policy
+- expression ile policy switching
+
+destekleniyor.
 
 ### 8. Reusable Block / Subgraph
 

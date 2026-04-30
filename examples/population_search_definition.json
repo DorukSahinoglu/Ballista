@@ -45,6 +45,72 @@
       "default": []
     },
     {
+      "name": "schedule_progress",
+      "kind": "scalar",
+      "representation": "schedule_progress",
+      "default": 0.0
+    },
+    {
+      "name": "mutation_scale",
+      "kind": "scalar",
+      "representation": "mutation_scale",
+      "default": 0.35
+    },
+    {
+      "name": "directional_scale",
+      "kind": "scalar",
+      "representation": "directional_scale",
+      "default": 0.3
+    },
+    {
+      "name": "restart_mode",
+      "kind": "scalar",
+      "representation": "restart_mode",
+      "default": "elite_biased"
+    },
+    {
+      "name": "minimum_distance",
+      "kind": "scalar",
+      "representation": "minimum_distance",
+      "default": 0.2
+    },
+    {
+      "name": "annealing_temperature",
+      "kind": "scalar",
+      "representation": "annealing_temperature",
+      "default": 0.18
+    },
+    {
+      "name": "selection_policy",
+      "kind": "scalar",
+      "representation": "selection_policy",
+      "default": "rank"
+    },
+    {
+      "name": "acceptance_policy",
+      "kind": "scalar",
+      "representation": "acceptance_policy",
+      "default": "annealed"
+    },
+    {
+      "name": "best_score_trend",
+      "kind": "object",
+      "representation": "trend_profile",
+      "default": {}
+    },
+    {
+      "name": "diversity_trend",
+      "kind": "object",
+      "representation": "trend_profile",
+      "default": {}
+    },
+    {
+      "name": "response_mode",
+      "kind": "scalar",
+      "representation": "response_mode",
+      "default": "neutral"
+    },
+    {
       "name": "population_summary",
       "kind": "object",
       "representation": "population_summary",
@@ -55,6 +121,94 @@
       "kind": "object",
       "representation": "best_candidate",
       "default": {}
+    }
+  ],
+  "subgraphs": [
+    {
+      "name": "response_block",
+      "node": {
+        "type": "sequence",
+        "name": "response_block_sequence",
+        "steps": [
+          {
+            "type": "operator",
+            "name": "set_response_mode",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "response_mode",
+              "value": {
+                "$ref": "args.response_mode"
+              }
+            }
+          },
+          {
+            "type": "operator",
+            "name": "set_response_selection_policy",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "selection_policy",
+              "value": {
+                "$ref": "args.selection_policy"
+              }
+            }
+          },
+          {
+            "type": "operator",
+            "name": "set_response_acceptance_policy",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "acceptance_policy",
+              "value": {
+                "$ref": "args.acceptance_policy"
+              }
+            }
+          },
+          {
+            "type": "operator",
+            "name": "set_response_restart_mode",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "restart_mode",
+              "value": {
+                "$ref": "args.restart_mode"
+              }
+            }
+          },
+          {
+            "type": "operator",
+            "name": "set_response_minimum_distance",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "minimum_distance",
+              "value": {
+                "$ref": "args.minimum_distance"
+              }
+            }
+          },
+          {
+            "type": "operator",
+            "name": "set_response_mutation_scale",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "mutation_scale",
+              "value": {
+                "$ref": "args.mutation_scale"
+              }
+            }
+          },
+          {
+            "type": "operator",
+            "name": "set_response_directional_scale",
+            "operator": "set_slot_value",
+            "params": {
+              "slot": "directional_scale",
+              "value": {
+                "$ref": "args.directional_scale"
+              }
+            }
+          }
+        ]
+      }
     }
   ],
   "root": {
@@ -99,6 +253,364 @@
           "steps": [
             {
               "type": "operator",
+              "name": "set_schedule_progress",
+              "operator": "set_slot_value",
+              "message": "progress ratio updated from the current iteration",
+              "snapshot_keys": ["schedule_progress"],
+              "params": {
+                "slot": "schedule_progress",
+                "value": {
+                  "$expr": {
+                    "op": "clamp",
+                    "value": {
+                      "$expr": {
+                        "op": "div",
+                        "left": {
+                          "$ref": "iteration"
+                        },
+                        "right": 5
+                      }
+                    },
+                    "min_value": 0.0,
+                    "max_value": 1.0
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_mutation_scale",
+              "operator": "set_slot_value",
+              "message": "mutation scale cooled according to the schedule",
+              "snapshot_keys": ["mutation_scale"],
+              "params": {
+                "slot": "mutation_scale",
+                "value": {
+                  "$expr": {
+                    "op": "lerp",
+                    "start": 0.55,
+                    "end": 0.12,
+                    "t": {
+                      "$ref": "slots.schedule_progress"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_directional_scale",
+              "operator": "set_slot_value",
+              "message": "directional exploitation scale increased with progress",
+              "snapshot_keys": ["directional_scale"],
+              "params": {
+                "slot": "directional_scale",
+                "value": {
+                  "$expr": {
+                    "op": "lerp",
+                    "start": 0.18,
+                    "end": 0.42,
+                    "t": {
+                      "$ref": "slots.schedule_progress"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_annealing_temperature",
+              "operator": "set_slot_value",
+              "message": "acceptance temperature cooled with the iteration schedule",
+              "snapshot_keys": ["annealing_temperature"],
+              "params": {
+                "slot": "annealing_temperature",
+                "value": {
+                  "$expr": {
+                    "op": "lerp",
+                    "start": 0.28,
+                    "end": 0.02,
+                    "t": {
+                      "$ref": "slots.schedule_progress"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_best_score_trend",
+              "operator": "set_slot_value",
+              "message": "best score memory updated from recent summaries",
+              "snapshot_keys": ["best_score_trend"],
+              "params": {
+                "slot": "best_score_trend",
+                "value": {
+                  "$expr": {
+                    "op": "trend_profile",
+                    "metric": "best_score",
+                    "nodes": ["summarize_initial_population", "summarize_population"],
+                    "window": 4,
+                    "include_current": false,
+                    "preference": "decrease",
+                    "tolerance": 0.0005
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_diversity_trend",
+              "operator": "set_slot_value",
+              "message": "diversity memory updated from recent summaries",
+              "snapshot_keys": ["diversity_trend"],
+              "params": {
+                "slot": "diversity_trend",
+                "value": {
+                  "$expr": {
+                    "op": "trend_profile",
+                    "metric": "population_diversity_span",
+                    "nodes": ["summarize_initial_population", "summarize_population"],
+                    "window": 4,
+                    "include_current": false,
+                    "preference": "increase",
+                    "tolerance": 0.03
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_selection_policy",
+              "operator": "set_slot_value",
+              "message": "selection policy adapted from the current search phase",
+              "snapshot_keys": ["selection_policy"],
+              "params": {
+                "slot": "selection_policy",
+                "value": {
+                  "$expr": {
+                    "op": "if",
+                    "condition": {
+                      "$expr": {
+                        "op": "gte",
+                        "left": {
+                          "$ref": "slots.best_score_trend.stagnation_steps"
+                        },
+                        "right": 1
+                      }
+                    },
+                    "then": "roulette",
+                    "else": {
+                      "$expr": {
+                        "op": "if",
+                        "condition": {
+                          "$expr": {
+                            "op": "lt",
+                            "left": {
+                              "$ref": "slots.schedule_progress"
+                            },
+                            "right": 0.4
+                          }
+                        },
+                        "then": "rank",
+                        "else": "tournament"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_acceptance_policy",
+              "operator": "set_slot_value",
+              "message": "acceptance policy adapted from diversity feedback",
+              "snapshot_keys": ["acceptance_policy"],
+              "params": {
+                "slot": "acceptance_policy",
+                "value": {
+                  "$expr": {
+                    "op": "if",
+                    "condition": {
+                      "$expr": {
+                        "op": "and",
+                        "args": [
+                          {
+                            "$expr": {
+                              "op": "lt",
+                              "left": {
+                                "$ref": "slots.diversity_trend.latest"
+                              },
+                              "right": 1.0
+                            }
+                          },
+                          {
+                            "$expr": {
+                              "op": "not",
+                              "value": {
+                                "$ref": "slots.diversity_trend.is_improving"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "then": "diversity_guarded",
+                    "else": "annealed"
+                  }
+                }
+              }
+            },
+            {
+              "type": "condition",
+              "name": "run_memory_response_block",
+              "snapshot_keys": ["response_mode", "restart_mode", "selection_policy", "acceptance_policy"],
+              "true_message": "stagnation response block activated",
+              "false_message": "momentum response block activated",
+              "condition": {
+                "expression": {
+                  "op": "or",
+                  "args": [
+                    {
+                      "op": "gte",
+                      "left": {
+                        "op": "ref",
+                        "path": "slots.best_score_trend.stagnation_steps"
+                      },
+                      "right": 2
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "ref",
+                        "path": "slots.acceptance_policy"
+                      },
+                      "right": "diversity_guarded"
+                    }
+                  ]
+                }
+              },
+              "then": {
+                "type": "subgraph",
+                "name": "activate_diversify_response",
+                "ref": "response_block",
+                "params": {
+                  "response_mode": "diversify_response",
+                  "selection_policy": "roulette",
+                  "acceptance_policy": "diversity_guarded",
+                  "restart_mode": "uniform",
+                  "minimum_distance": {
+                    "$expr": {
+                      "op": "max",
+                      "args": [
+                        0.45,
+                        {
+                          "$expr": {
+                            "op": "mul",
+                            "args": [
+                              {
+                                "$ref": "slots.schedule_progress"
+                              },
+                              0.55
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "mutation_scale": {
+                    "$expr": {
+                      "op": "clamp",
+                      "value": {
+                        "$expr": {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "$ref": "slots.mutation_scale"
+                            },
+                            1.2
+                          ]
+                        }
+                      },
+                      "min_value": 0.18,
+                      "max_value": 0.7
+                    }
+                  },
+                  "directional_scale": {
+                    "$expr": {
+                      "op": "clamp",
+                      "value": {
+                        "$expr": {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "$ref": "slots.directional_scale"
+                            },
+                            0.85
+                          ]
+                        }
+                      },
+                      "min_value": 0.16,
+                      "max_value": 0.45
+                    }
+                  }
+                }
+              },
+              "else": {
+                "type": "subgraph",
+                "name": "activate_intensify_response",
+                "ref": "response_block",
+                "params": {
+                  "response_mode": "intensify_response",
+                  "selection_policy": {
+                    "$ref": "slots.selection_policy"
+                  },
+                  "acceptance_policy": {
+                    "$ref": "slots.acceptance_policy"
+                  },
+                  "restart_mode": "elite_biased",
+                  "minimum_distance": 0.2,
+                  "mutation_scale": {
+                    "$expr": {
+                      "op": "clamp",
+                      "value": {
+                        "$expr": {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "$ref": "slots.mutation_scale"
+                            },
+                            0.9
+                          ]
+                        }
+                      },
+                      "min_value": 0.08,
+                      "max_value": 0.55
+                    }
+                  },
+                  "directional_scale": {
+                    "$expr": {
+                      "op": "clamp",
+                      "value": {
+                        "$expr": {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "$ref": "slots.directional_scale"
+                            },
+                            1.05
+                          ]
+                        }
+                      },
+                      "min_value": 0.18,
+                      "max_value": 0.48
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
               "name": "select_population_batch",
               "operator": "select_population_batch",
               "message": "candidates selected with tournament policy",
@@ -108,7 +620,9 @@
                   "$ref": "slots.population"
                 },
                 "selection_size": 3,
-                "selection_policy": "tournament",
+                "selection_policy": {
+                  "$ref": "slots.selection_policy"
+                },
                 "tournament_size": 3,
                 "output_slot": "selected_population"
               }
@@ -127,26 +641,28 @@
                 "output_slot": "elite_population"
               }
             },
-      {
-        "type": "operator",
-        "name": "recombine_population",
-        "operator": "recombine_population",
-        "message": "selected candidates recombined into directional offspring",
-        "snapshot_keys": ["recombined_population"],
-        "params": {
-          "parents": {
-            "$ref": "slots.selected_population"
-          },
-          "offspring_count": 4,
-          "pairing_policy": "random",
-          "recombination_policy": "directional",
-          "blend_bias": 0.55,
-          "directional_scale": 0.3,
-          "jitter_scale": 0.12,
-          "target": {
-            "$ref": "slots.target"
-          },
-          "output_slot": "recombined_population"
+            {
+              "type": "operator",
+              "name": "recombine_population",
+              "operator": "recombine_population",
+              "message": "selected candidates recombined into directional offspring",
+              "snapshot_keys": ["recombined_population"],
+              "params": {
+                "parents": {
+                  "$ref": "slots.selected_population"
+                },
+                "offspring_count": 4,
+                "pairing_policy": "random",
+                "recombination_policy": "directional",
+                "blend_bias": 0.55,
+                "directional_scale": {
+                  "$ref": "slots.directional_scale"
+                },
+                "jitter_scale": 0.12,
+                "target": {
+                  "$ref": "slots.target"
+                },
+                "output_slot": "recombined_population"
               }
             },
             {
@@ -160,32 +676,39 @@
                   "$ref": "slots.recombined_population"
                 },
                 "clones_per_candidate": 1,
-                "mutation_scale": 0.35,
+                "mutation_scale": {
+                  "$ref": "slots.mutation_scale"
+                },
                 "target": {
                   "$ref": "slots.target"
                 },
                 "output_slot": "mutated_population"
               }
             },
-      {
-        "type": "operator",
-        "name": "accept_population_candidates",
-        "operator": "accept_population_candidates",
-        "message": "diversity-guarded offspring accepted into the active candidate set",
-        "snapshot_keys": ["accepted_population"],
-        "params": {
-          "current_population": {
-            "$ref": "slots.population"
-          },
-          "candidates": {
-            "$ref": "slots.mutated_population"
-          },
-          "acceptance_policy": "diversity_guarded",
-          "minimum_distance": 0.35,
-          "target_population_size": 6,
-          "output_slot": "accepted_population"
-        }
-      },
+            {
+              "type": "operator",
+              "name": "accept_population_candidates",
+              "operator": "accept_population_candidates",
+              "message": "annealed acceptance applied with a cooling schedule",
+              "snapshot_keys": ["accepted_population"],
+              "params": {
+                "current_population": {
+                  "$ref": "slots.population"
+                },
+                "candidates": {
+                  "$ref": "slots.mutated_population"
+                },
+                "acceptance_policy": {
+                  "$ref": "slots.acceptance_policy"
+                },
+                "annealing_temperature": {
+                  "$ref": "slots.annealing_temperature"
+                },
+                "minimum_distance": 0.35,
+                "target_population_size": 6,
+                "output_slot": "accepted_population"
+              }
+            },
             {
               "type": "operator",
               "name": "restart_population",
@@ -205,7 +728,9 @@
                 },
                 "min_position": -8.0,
                 "max_position": 8.0,
-                "restart_mode": "elite_biased",
+                "restart_mode": {
+                  "$ref": "slots.restart_mode"
+                },
                 "output_slot": "population"
               }
             },

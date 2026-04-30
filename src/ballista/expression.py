@@ -34,6 +34,10 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "max",
     "avg",
     "round",
+    "clamp",
+    "lerp",
+    "metric_history",
+    "trend_profile",
     "filter",
     "map",
     "sort_by",
@@ -104,6 +108,58 @@ def evaluate_expression(
         value = _eval_operand(expression["value"], context, scope)
         digits = _eval_operand(expression.get("digits", 0), context, scope)
         return round(value, digits)
+
+    if operator == "clamp":
+        value = _eval_operand(expression["value"], context, scope)
+        min_value = _eval_operand(expression["min_value"], context, scope)
+        max_value = _eval_operand(expression["max_value"], context, scope)
+        if min_value > max_value:
+            raise ValueError("Expression 'clamp' expects min_value <= max_value")
+        return min(max(value, min_value), max_value)
+
+    if operator == "lerp":
+        start = _eval_operand(expression["start"], context, scope)
+        end = _eval_operand(expression["end"], context, scope)
+        t = _eval_operand(expression["t"], context, scope)
+        return start + ((end - start) * t)
+
+    if operator == "metric_history":
+        metric_name = expression.get("metric")
+        if not isinstance(metric_name, str) or not metric_name.strip():
+            raise ValueError("Expression 'metric_history' requires a non-empty metric")
+        nodes = _eval_operand(expression.get("nodes"), context, scope)
+        window = expression.get("window")
+        include_current = bool(_eval_operand(expression.get("include_current", True), context, scope))
+        return _build_metric_history(
+            context=context,
+            metric_name=metric_name,
+            nodes=nodes,
+            window=None if window is None else int(_eval_operand(window, context, scope)),
+            include_current=include_current,
+        )
+
+    if operator == "trend_profile":
+        source = expression.get("source")
+        if source is None:
+            metric_name = expression.get("metric")
+            if not isinstance(metric_name, str) or not metric_name.strip():
+                raise ValueError("Expression 'trend_profile' requires either 'source' or a non-empty 'metric'")
+            nodes = _eval_operand(expression.get("nodes"), context, scope)
+            window = expression.get("window")
+            include_current = bool(_eval_operand(expression.get("include_current", True), context, scope))
+            values = _build_metric_history(
+                context=context,
+                metric_name=metric_name,
+                nodes=nodes,
+                window=None if window is None else int(_eval_operand(window, context, scope)),
+                include_current=include_current,
+            )
+        else:
+            values = _eval_operand(source, context, scope)
+
+        preference = str(_eval_operand(expression.get("preference", "decrease"), context, scope))
+        tolerance = float(_eval_operand(expression.get("tolerance", 0.0), context, scope))
+        return _build_trend_profile(values=values, preference=preference, tolerance=tolerance)
 
     if operator == "get":
         source = _eval_operand(expression["source"], context, scope)
@@ -1896,6 +1952,96 @@ def _build_square_patterns(
 
     patterns.sort(key=lambda item: item["node_ids"])
     return patterns
+
+
+def _build_metric_history(
+    context: BallistaContext,
+    metric_name: str,
+    nodes: Any,
+    window: int | None,
+    include_current: bool,
+) -> list[Any]:
+    if window is not None and window <= 0:
+        raise ValueError("metric_history window must be > 0")
+
+    allowed_nodes: set[str] | None = None
+    if nodes is not None:
+        if isinstance(nodes, str):
+            allowed_nodes = {nodes}
+        elif isinstance(nodes, list) and all(isinstance(item, str) for item in nodes):
+            allowed_nodes = set(nodes)
+        else:
+            raise TypeError("metric_history nodes must be a string or list of strings")
+
+    values = []
+    for record in context.history:
+        if allowed_nodes is not None and record.node not in allowed_nodes:
+            continue
+        if metric_name not in record.metrics:
+            continue
+        values.append(deepcopy(record.metrics[metric_name]))
+
+    if include_current and metric_name in context.metrics:
+        values.append(deepcopy(context.metrics[metric_name]))
+
+    if window is not None:
+        values = values[-window:]
+    return values
+
+
+def _build_trend_profile(
+    values: Any,
+    preference: str,
+    tolerance: float,
+) -> dict[str, Any]:
+    if not isinstance(values, list):
+        raise TypeError("trend_profile expects a list source")
+
+    numeric_values = [_coerce_numeric_value(value, "trend value") for value in values]
+    if tolerance < 0:
+        raise ValueError("trend_profile tolerance must be >= 0")
+
+    if preference not in {"decrease", "increase"}:
+        raise ValueError("trend_profile preference must be 'decrease' or 'increase'")
+
+    latest = numeric_values[-1] if numeric_values else None
+    previous = numeric_values[-2] if len(numeric_values) >= 2 else None
+    delta = None if previous is None or latest is None else latest - previous
+    deltas = [
+        numeric_values[index] - numeric_values[index - 1]
+        for index in range(1, len(numeric_values))
+    ]
+    avg_delta = None if not deltas else sum(deltas) / len(deltas)
+
+    stagnation_steps = 0
+    for change in reversed(deltas):
+        if _is_improving_delta(change, preference, tolerance):
+            break
+        stagnation_steps += 1
+
+    return {
+        "values": [round(value, 6) for value in numeric_values],
+        "count": len(numeric_values),
+        "latest": None if latest is None else round(latest, 6),
+        "previous": None if previous is None else round(previous, 6),
+        "delta": None if delta is None else round(delta, 6),
+        "avg_delta": None if avg_delta is None else round(avg_delta, 6),
+        "best": None if not numeric_values else round(min(numeric_values), 6),
+        "worst": None if not numeric_values else round(max(numeric_values), 6),
+        "stagnation_steps": stagnation_steps,
+        "is_improving": False if delta is None else _is_improving_delta(delta, preference, tolerance),
+        "preference": preference,
+    }
+
+
+def _is_improving_delta(
+    delta: float,
+    preference: str,
+    tolerance: float,
+) -> bool:
+    if preference == "decrease":
+        return delta < (-tolerance)
+    return delta > tolerance
 
 
 def _breadth_first_distances(

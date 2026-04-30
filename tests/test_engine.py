@@ -1369,7 +1369,7 @@ class EngineTests(unittest.TestCase):
                     "name": "best",
                     "kind": "object",
                     "representation": "best_candidate",
-                    "default": {},
+                    "default": None,
                 },
             ],
             "root": {
@@ -1698,6 +1698,499 @@ class EngineTests(unittest.TestCase):
             for right in accepted[left_index + 1 :]:
                 self.assertGreaterEqual(abs(left["position"] - right["position"]), 0.4)
 
+    def test_population_operators_support_scheduled_params_and_annealed_acceptance(self) -> None:
+        definition = {
+            "name": "scheduled_population_definition",
+            "initial_slots": {
+                "target": 0.0,
+                "population": [
+                    {"position": 0.0, "mass": 1.0, "score": 0.0},
+                    {"position": 1.0, "mass": 1.0, "score": 1.0},
+                    {"position": 2.0, "mass": 1.0, "score": 2.0},
+                ],
+            },
+            "slot_definitions": [
+                {
+                    "name": "population",
+                    "kind": "object_collection",
+                    "representation": "candidate_population",
+                    "default": [],
+                },
+                {
+                    "name": "selected_population",
+                    "kind": "object_collection",
+                    "representation": "selected_population",
+                    "default": [],
+                },
+                {
+                    "name": "recombined_population",
+                    "kind": "object_collection",
+                    "representation": "recombined_population",
+                    "default": [],
+                },
+                {
+                    "name": "accepted_population",
+                    "kind": "object_collection",
+                    "representation": "accepted_population",
+                    "default": [],
+                },
+                {
+                    "name": "schedule_progress",
+                    "kind": "scalar",
+                    "representation": "schedule_progress",
+                    "default": 0.0,
+                },
+                {
+                    "name": "directional_scale",
+                    "kind": "scalar",
+                    "representation": "directional_scale",
+                    "default": 0.0,
+                },
+                {
+                    "name": "annealing_temperature",
+                    "kind": "scalar",
+                    "representation": "annealing_temperature",
+                    "default": 0.0,
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_schedule_progress",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "schedule_progress",
+                            "value": {
+                                "$expr": {
+                                    "op": "clamp",
+                                    "value": 0.4,
+                                    "min_value": 0.0,
+                                    "max_value": 1.0,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_directional_scale",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "directional_scale",
+                            "value": {
+                                "$expr": {
+                                    "op": "lerp",
+                                    "start": 0.2,
+                                    "end": 0.5,
+                                    "t": {"$ref": "slots.schedule_progress"},
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_annealing_temperature",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "annealing_temperature",
+                            "value": {
+                                "$expr": {
+                                    "op": "lerp",
+                                    "start": 0.05,
+                                    "end": 0.000001,
+                                    "t": 1.0,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "select_population_batch",
+                        "operator": "select_population_batch",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "selection_size": 3,
+                            "selection_policy": "top",
+                            "output_slot": "selected_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "recombine_population",
+                        "operator": "recombine_population",
+                        "params": {
+                            "parents": {"$ref": "slots.selected_population"},
+                            "offspring_count": 3,
+                            "pairing_policy": "sequential",
+                            "recombination_policy": "directional",
+                            "directional_scale": {"$ref": "slots.directional_scale"},
+                            "jitter_scale": 0.0,
+                            "target": {"$ref": "slots.target"},
+                            "output_slot": "recombined_population",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "accept_population_candidates",
+                        "operator": "accept_population_candidates",
+                        "params": {
+                            "current_population": {"$ref": "slots.population"},
+                            "candidates": {"$ref": "slots.recombined_population"},
+                            "acceptance_policy": "annealed",
+                            "annealing_temperature": {"$ref": "slots.annealing_temperature"},
+                            "target_population_size": 2,
+                            "output_slot": "accepted_population",
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertAlmostEqual(result.get("schedule_progress"), 0.4)
+        self.assertAlmostEqual(result.get("directional_scale"), 0.32, places=6)
+        self.assertAlmostEqual(result.get("annealing_temperature"), 0.000001, places=6)
+        self.assertEqual([round(item["position"], 2) for item in result.get("recombined_population")], [-0.32, 0.68, -0.64])
+        self.assertEqual([round(item["score"], 2) for item in result.get("accepted_population")], [0.0, 0.32])
+        self.assertEqual(result.metrics.get("acceptance_policy"), "annealed")
+
+    def test_population_operators_support_rank_selection_policy(self) -> None:
+        definition = {
+            "name": "rank_selection_definition",
+            "initial_slots": {
+                "rng_seed": 23,
+                "target": 0.0,
+                "population": [
+                    {"position": 0.0, "mass": 1.0, "score": 0.0},
+                    {"position": 1.0, "mass": 1.0, "score": 1.0},
+                    {"position": 2.0, "mass": 1.0, "score": 2.0},
+                    {"position": 3.0, "mass": 1.0, "score": 3.0},
+                ],
+            },
+            "slot_definitions": [
+                {
+                    "name": "population",
+                    "kind": "object_collection",
+                    "representation": "candidate_population",
+                    "default": [],
+                },
+                {
+                    "name": "selected_population",
+                    "kind": "object_collection",
+                    "representation": "selected_population",
+                    "default": [],
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "select_population_batch",
+                        "operator": "select_population_batch",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "selection_size": 5,
+                            "selection_policy": "rank",
+                            "output_slot": "selected_population",
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(len(result.get("selected_population")), 5)
+        self.assertEqual(result.metrics.get("selection_policy"), "rank")
+        self.assertTrue(all(item["position"] in {0.0, 1.0, 2.0, 3.0} for item in result.get("selected_population")))
+
+    def test_expression_supports_metric_history_and_trend_profile(self) -> None:
+        definition = {
+            "name": "trend_memory_definition",
+            "initial_slots": {
+                "population": [
+                    {"position": 0.0, "mass": 1.0, "score": 0.6},
+                    {"position": 1.0, "mass": 1.0, "score": 0.9},
+                ]
+            },
+            "slot_definitions": [
+                {
+                    "name": "population",
+                    "kind": "object_collection",
+                    "representation": "candidate_population",
+                    "default": [],
+                },
+                {
+                    "name": "population_summary",
+                    "kind": "object",
+                    "representation": "population_summary",
+                    "default": {},
+                },
+                {
+                    "name": "best",
+                    "kind": "object",
+                    "representation": "best_candidate",
+                    "default": None,
+                },
+                {
+                    "name": "best_score_history",
+                    "kind": "object_collection",
+                    "representation": "metric_history",
+                    "default": [],
+                },
+                {
+                    "name": "best_score_trend",
+                    "kind": "object",
+                    "representation": "trend_profile",
+                    "default": {},
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "summarize_initial_population",
+                        "operator": "summarize_population",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "output_slot": "population_summary",
+                            "best_output_slot": "best",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_population",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "population",
+                            "value": [
+                                {"position": 0.0, "mass": 1.0, "score": 0.4},
+                                {"position": 1.0, "mass": 1.0, "score": 0.7},
+                            ],
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "summarize_population",
+                        "operator": "summarize_population",
+                        "params": {
+                            "population": {"$ref": "slots.population"},
+                            "output_slot": "population_summary",
+                            "best_output_slot": "best",
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_best_score_history",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "best_score_history",
+                            "value": {
+                                "$expr": {
+                                    "op": "metric_history",
+                                    "metric": "best_score",
+                                    "nodes": ["summarize_initial_population", "summarize_population"],
+                                    "window": 3,
+                                }
+                            },
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_best_score_trend",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "best_score_trend",
+                            "value": {
+                                "$expr": {
+                                    "op": "trend_profile",
+                                    "metric": "best_score",
+                                    "nodes": ["summarize_initial_population", "summarize_population"],
+                                    "window": 3,
+                                    "preference": "decrease",
+                                    "tolerance": 0.001,
+                                }
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("best_score_history"), [0.6, 0.4, 0.4])
+        self.assertEqual(result.get("best_score_trend")["values"], [0.6, 0.4, 0.4])
+        self.assertEqual(result.get("best_score_trend")["stagnation_steps"], 1)
+        self.assertFalse(result.get("best_score_trend")["is_improving"])
+        self.assertAlmostEqual(result.get("best_score_trend")["avg_delta"], -0.1, places=6)
+
+    def test_condition_and_subgraph_support_memory_driven_population_response(self) -> None:
+        definition = {
+            "name": "memory_response_definition",
+            "slot_definitions": [
+                {
+                    "name": "best_score_trend",
+                    "kind": "object",
+                    "representation": "trend_profile",
+                    "default": {"stagnation_steps": 0},
+                },
+                {
+                    "name": "selection_policy",
+                    "kind": "scalar",
+                    "representation": "selection_policy",
+                    "default": "rank",
+                },
+                {
+                    "name": "acceptance_policy",
+                    "kind": "scalar",
+                    "representation": "acceptance_policy",
+                    "default": "annealed",
+                },
+                {
+                    "name": "restart_mode",
+                    "kind": "scalar",
+                    "representation": "restart_mode",
+                    "default": "elite_biased",
+                },
+                {
+                    "name": "response_mode",
+                    "kind": "scalar",
+                    "representation": "response_mode",
+                    "default": "neutral",
+                },
+            ],
+            "subgraphs": [
+                {
+                    "name": "response_block",
+                    "node": {
+                        "type": "sequence",
+                        "name": "response_block_sequence",
+                        "steps": [
+                            {
+                                "type": "operator",
+                                "name": "set_response_mode",
+                                "operator": "set_slot_value",
+                                "params": {
+                                    "slot": "response_mode",
+                                    "value": {"$ref": "args.response_mode"},
+                                },
+                            },
+                            {
+                                "type": "operator",
+                                "name": "set_response_selection",
+                                "operator": "set_slot_value",
+                                "params": {
+                                    "slot": "selection_policy",
+                                    "value": {"$ref": "args.selection_policy"},
+                                },
+                            },
+                            {
+                                "type": "operator",
+                                "name": "set_response_acceptance",
+                                "operator": "set_slot_value",
+                                "params": {
+                                    "slot": "acceptance_policy",
+                                    "value": {"$ref": "args.acceptance_policy"},
+                                },
+                            },
+                            {
+                                "type": "operator",
+                                "name": "set_response_restart",
+                                "operator": "set_slot_value",
+                                "params": {
+                                    "slot": "restart_mode",
+                                    "value": {"$ref": "args.restart_mode"},
+                                },
+                            },
+                        ],
+                    },
+                }
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_best_score_trend",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "best_score_trend",
+                            "value": {"stagnation_steps": 3},
+                        },
+                    },
+                    {
+                        "type": "condition",
+                        "name": "run_memory_response_block",
+                        "condition": {
+                            "expression": {
+                                "op": "gte",
+                                "left": {"op": "ref", "path": "slots.best_score_trend.stagnation_steps"},
+                                "right": 2,
+                            }
+                        },
+                        "then": {
+                            "type": "subgraph",
+                            "name": "activate_diversify_response",
+                            "ref": "response_block",
+                            "params": {
+                                "response_mode": "diversify_response",
+                                "selection_policy": "roulette",
+                                "acceptance_policy": "diversity_guarded",
+                                "restart_mode": "uniform",
+                            },
+                        },
+                        "else": {
+                            "type": "subgraph",
+                            "name": "activate_intensify_response",
+                            "ref": "response_block",
+                            "params": {
+                                "response_mode": "intensify_response",
+                                "selection_policy": "tournament",
+                                "acceptance_policy": "annealed",
+                                "restart_mode": "elite_biased",
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("response_mode"), "diversify_response")
+        self.assertEqual(result.get("selection_policy"), "roulette")
+        self.assertEqual(result.get("acceptance_policy"), "diversity_guarded")
+        self.assertEqual(result.get("restart_mode"), "uniform")
+
     def test_validator_reports_unknown_subgraph_reference(self) -> None:
         invalid_definition = {
             "name": "invalid_subgraph_definition",
@@ -1836,6 +2329,10 @@ class EngineTests(unittest.TestCase):
         self.assertIn("summarize_population", operator_names)
         self.assertIn("supported_expression_operators", contract)
         self.assertIn("reduce", contract["supported_expression_operators"])
+        self.assertIn("clamp", contract["supported_expression_operators"])
+        self.assertIn("lerp", contract["supported_expression_operators"])
+        self.assertIn("metric_history", contract["supported_expression_operators"])
+        self.assertIn("trend_profile", contract["supported_expression_operators"])
         self.assertIn("matrix_degrees", contract["supported_expression_operators"])
         self.assertIn("connected_components", contract["supported_expression_operators"])
         self.assertIn("shortest_path", contract["supported_expression_operators"])

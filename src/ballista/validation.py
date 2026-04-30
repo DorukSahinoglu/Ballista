@@ -536,6 +536,52 @@ def _validate_expression(
         _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
         return
 
+    if operator == "clamp":
+        for key in ("value", "min_value", "max_value"):
+            if key not in expression:
+                issues.append(ValidationIssue(path=f"{path}.{key}", message=f"Expression clamp requires '{key}'"))
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "lerp":
+        for key in ("start", "end", "t"):
+            if key not in expression:
+                issues.append(ValidationIssue(path=f"{path}.{key}", message=f"Expression lerp requires '{key}'"))
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "metric_history":
+        metric = expression.get("metric")
+        if not isinstance(metric, str) or not metric.strip():
+            issues.append(ValidationIssue(path=f"{path}.metric", message="Expression metric_history requires 'metric'"))
+        for key in ("nodes", "window", "include_current"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
+    if operator == "trend_profile":
+        if "source" not in expression:
+            metric = expression.get("metric")
+            if not isinstance(metric, str) or not metric.strip():
+                issues.append(
+                    ValidationIssue(
+                        path=f"{path}.metric",
+                        message="Expression trend_profile requires 'source' or 'metric'",
+                    )
+                )
+            for key in ("nodes", "window", "include_current"):
+                if key in expression:
+                    _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        for key in ("preference", "tolerance"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
     if operator == "round":
         if "value" not in expression:
             issues.append(ValidationIssue(path=f"{path}.value", message="Expression round requires 'value'"))

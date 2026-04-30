@@ -178,6 +178,10 @@ def _select_population_batch(context: BallistaContext, params: dict[str, Any]) -
     elif selection_policy == "roulette":
         weights = [1.0 / (item["score"] + 1e-6) for item in population]
         selected = [dict(item) for item in rng.choices(population, weights=weights, k=selection_size)]
+    elif selection_policy == "rank":
+        ranked_population = sorted(population, key=lambda item: item["score"])
+        weights = list(range(len(ranked_population), 0, -1))
+        selected = [dict(item) for item in rng.choices(ranked_population, weights=weights, k=selection_size)]
     else:
         raise ValueError(f"Unsupported selection_policy '{selection_policy}'")
 
