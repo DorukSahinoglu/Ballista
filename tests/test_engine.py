@@ -2584,6 +2584,49 @@ class EngineTests(unittest.TestCase):
 
         self.assertEqual(result.get("value"), 9)
 
+    def test_expression_supports_concat_for_phase_response_keys(self) -> None:
+        definition = {
+            "name": "concat_definition",
+            "slot_definitions": [
+                {
+                    "name": "key",
+                    "kind": "scalar",
+                    "representation": "composite_key",
+                    "default": "",
+                }
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_key",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "key",
+                            "value": {
+                                "$expr": {
+                                    "op": "concat",
+                                    "args": ["early", "intensify_response"],
+                                    "separator": "::",
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("key"), "early::intensify_response")
+
     def test_expression_supports_assoc_for_effectiveness_aggregation(self) -> None:
         definition = {
             "name": "assoc_definition",
@@ -2993,6 +3036,7 @@ class EngineTests(unittest.TestCase):
         self.assertIn("frequency_map", contract["supported_expression_operators"])
         self.assertIn("pairwise_deltas", contract["supported_expression_operators"])
         self.assertIn("assoc", contract["supported_expression_operators"])
+        self.assertIn("concat", contract["supported_expression_operators"])
         self.assertIn("max_by", contract["supported_expression_operators"])
         self.assertIn("min_by", contract["supported_expression_operators"])
         self.assertIn("matrix_degrees", contract["supported_expression_operators"])

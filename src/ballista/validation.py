@@ -608,6 +608,17 @@ def _validate_expression(
             _validate_expression_operand(expression["digits"], f"{path}.digits", slot_schema, issues)
         return
 
+    if operator == "concat":
+        args = expression.get("args")
+        if not isinstance(args, list):
+            issues.append(ValidationIssue(path=f"{path}.args", message="Expression concat requires an 'args' list"))
+            return
+        for index, arg in enumerate(args):
+            _validate_expression_operand(arg, f"{path}.args[{index}]", slot_schema, issues)
+        if "separator" in expression:
+            _validate_expression_operand(expression["separator"], f"{path}.separator", slot_schema, issues)
+        return
+
     if operator == "get":
         for key in ("source", "key"):
             if key not in expression:

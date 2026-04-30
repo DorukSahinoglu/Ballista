@@ -199,6 +199,7 @@ Bugun desteklenen operatorler:
 - `contains`, `in`
 - `add`, `sub`, `mul`, `div`, `pow`, `mod`
 - `abs`, `min`, `max`, `avg`, `round`
+- `concat`
 - `clamp`, `lerp`
 - `metric_history`, `trend_profile`
 - `slot_history`
@@ -280,6 +281,7 @@ Bu DSL ile kullanici:
 - response adaylarini agirlikli skor bilesenleriyle degerlendirip neden secildigini daha okunur hale getirebilir
 - response ve policy gecmisinden usage profile cikarip ayni response'u fazla kullanmaya karsi penalty/novelty mantigi kurabilir
 - response'larin gecmis iterasyonlarda ne kadar iyilestirme getirdigini outcome/effectiveness memory olarak toplayip buna gore secim yapabilir
+- ayni response'un erken/orta/gec fazlarda farkli etkisini ayri phase-aware effectiveness profilleri olarak tutabilir
 
 Registry tarafinda da artik su tip population operatorleri var:
 

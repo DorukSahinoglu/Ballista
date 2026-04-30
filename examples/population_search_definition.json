@@ -51,6 +51,18 @@
       "default": 0.0
     },
     {
+      "name": "phase_label",
+      "kind": "scalar",
+      "representation": "phase_label",
+      "default": "early"
+    },
+    {
+      "name": "phase_history",
+      "kind": "object_collection",
+      "representation": "phase_history",
+      "default": []
+    },
+    {
       "name": "mutation_scale",
       "kind": "scalar",
       "representation": "mutation_scale",
@@ -160,6 +172,12 @@
     },
     {
       "name": "response_effectiveness_profile",
+      "kind": "mapping",
+      "representation": "effectiveness_profile",
+      "default": {}
+    },
+    {
+      "name": "phase_response_effectiveness_profile",
       "kind": "mapping",
       "representation": "effectiveness_profile",
       "default": {}
@@ -386,6 +404,47 @@
                     },
                     "min_value": 0.0,
                     "max_value": 1.0
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_phase_label",
+              "operator": "set_slot_value",
+              "message": "search phase label updated from schedule progress",
+              "snapshot_keys": ["phase_label"],
+              "params": {
+                "slot": "phase_label",
+                "value": {
+                  "$expr": {
+                    "op": "if",
+                    "condition": {
+                      "$expr": {
+                        "op": "lt",
+                        "left": {
+                          "$ref": "slots.schedule_progress"
+                        },
+                        "right": 0.34
+                      }
+                    },
+                    "then": "early",
+                    "else": {
+                      "$expr": {
+                        "op": "if",
+                        "condition": {
+                          "$expr": {
+                            "op": "lt",
+                            "left": {
+                              "$ref": "slots.schedule_progress"
+                            },
+                            "right": 0.67
+                          }
+                        },
+                        "then": "mid",
+                        "else": "late"
+                      }
+                    }
                   }
                 }
               }
@@ -800,6 +859,25 @@
             },
             {
               "type": "operator",
+              "name": "set_phase_history",
+              "operator": "set_slot_value",
+              "message": "phase history refreshed from recent iteration phases",
+              "snapshot_keys": ["phase_history"],
+              "params": {
+                "slot": "phase_history",
+                "value": {
+                  "$expr": {
+                    "op": "slot_history",
+                    "slot": "phase_label",
+                    "nodes": ["set_phase_label"],
+                    "window": 4,
+                    "include_current": true
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
               "name": "set_response_usage_profile",
               "operator": "set_slot_value",
               "message": "response usage counts aggregated from recent response history",
@@ -1202,6 +1280,41 @@
                                   "key": "avg_improvement",
                                   "default": 0.0
                                 }
+                              },
+                              "phase_effectiveness_signal": {
+                                "$expr": {
+                                  "op": "get",
+                                  "source": {
+                                    "$expr": {
+                                      "op": "get",
+                                      "source": {
+                                        "$ref": "slots.phase_response_effectiveness_profile"
+                                      },
+                                      "key": {
+                                        "$expr": {
+                                          "op": "concat",
+                                          "args": [
+                                            {
+                                              "$ref": "slots.phase_label"
+                                            },
+                                            {
+                                              "op": "ref",
+                                              "path": "vars.item.response_mode"
+                                            }
+                                          ],
+                                          "separator": "::"
+                                        }
+                                      },
+                                      "default": {
+                                        "count": 0,
+                                        "total_improvement": 0.0,
+                                        "avg_improvement": 0.0
+                                      }
+                                    }
+                                  },
+                                  "key": "avg_improvement",
+                                  "default": 0.0
+                                }
                               }
                             },
                             "score": {
@@ -1498,6 +1611,44 @@
                                       }
                                     },
                                     "weight": 2.2
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "$ref": "slots.phase_response_effectiveness_profile"
+                                            },
+                                            "key": {
+                                              "$expr": {
+                                                "op": "concat",
+                                                "args": [
+                                                  {
+                                                    "$ref": "slots.phase_label"
+                                                  },
+                                                  {
+                                                    "op": "ref",
+                                                    "path": "vars.item.response_mode"
+                                                  }
+                                                ],
+                                                "separator": "::"
+                                              }
+                                            },
+                                            "default": {
+                                              "count": 0,
+                                              "total_improvement": 0.0,
+                                              "avg_improvement": 0.0
+                                            }
+                                          }
+                                        },
+                                        "key": "avg_improvement",
+                                        "default": 0.0
+                                      }
+                                    },
+                                    "weight": 2.8
                                   }
                                 ]
                               }
@@ -1747,6 +1898,21 @@
                         "op": "ref",
                         "path": "vars.response_item"
                       },
+                      "phase_label": {
+                        "$expr": {
+                          "op": "get",
+                          "source": {
+                            "$ref": "slots.phase_history"
+                          },
+                          "key": {
+                            "op": "ref",
+                            "path": "vars.index"
+                          },
+                          "default": {
+                            "$ref": "slots.phase_label"
+                          }
+                        }
+                      },
                       "improvement": {
                         "$expr": {
                           "op": "get",
@@ -1940,6 +2106,280 @@
                                                 "key": {
                                                   "op": "ref",
                                                   "path": "vars.event.response_mode"
+                                                },
+                                                "default": {
+                                                  "count": 0,
+                                                  "total_improvement": 0.0,
+                                                  "avg_improvement": 0.0
+                                                }
+                                              }
+                                            },
+                                            "key": "count",
+                                            "default": 0
+                                          }
+                                        },
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_phase_response_effectiveness_profile",
+              "operator": "set_slot_value",
+              "message": "phase-aware response effectiveness profile aggregated from recent outcome events",
+              "snapshot_keys": ["phase_response_effectiveness_profile"],
+              "params": {
+                "slot": "phase_response_effectiveness_profile",
+                "value": {
+                  "$expr": {
+                    "op": "reduce",
+                    "source": {
+                      "$ref": "slots.response_outcome_events"
+                    },
+                    "as": "event",
+                    "accumulator_as": "acc",
+                    "initial": {},
+                    "value": {
+                      "op": "assoc",
+                      "source": {
+                        "op": "ref",
+                        "path": "vars.acc"
+                      },
+                      "key": {
+                        "$expr": {
+                          "op": "concat",
+                          "args": [
+                            {
+                              "op": "ref",
+                              "path": "vars.event.phase_label"
+                            },
+                            {
+                              "op": "ref",
+                              "path": "vars.event.response_mode"
+                            }
+                          ],
+                          "separator": "::"
+                        }
+                      },
+                      "value": {
+                        "$expr": {
+                          "op": "merge_objects",
+                          "objects": [
+                            {
+                              "$expr": {
+                                "op": "get",
+                                "source": {
+                                  "op": "ref",
+                                  "path": "vars.acc"
+                                },
+                                "key": {
+                                  "$expr": {
+                                    "op": "concat",
+                                    "args": [
+                                      {
+                                        "op": "ref",
+                                        "path": "vars.event.phase_label"
+                                      },
+                                      {
+                                        "op": "ref",
+                                        "path": "vars.event.response_mode"
+                                      }
+                                    ],
+                                    "separator": "::"
+                                  }
+                                },
+                                "default": {
+                                  "count": 0,
+                                  "total_improvement": 0.0,
+                                  "avg_improvement": 0.0
+                                }
+                              }
+                            },
+                            {
+                              "count": {
+                                "$expr": {
+                                  "op": "add",
+                                  "args": [
+                                    {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "op": "ref",
+                                              "path": "vars.acc"
+                                            },
+                                            "key": {
+                                              "$expr": {
+                                                "op": "concat",
+                                                "args": [
+                                                  {
+                                                    "op": "ref",
+                                                    "path": "vars.event.phase_label"
+                                                  },
+                                                  {
+                                                    "op": "ref",
+                                                    "path": "vars.event.response_mode"
+                                                  }
+                                                ],
+                                                "separator": "::"
+                                              }
+                                            },
+                                            "default": {
+                                              "count": 0,
+                                              "total_improvement": 0.0,
+                                              "avg_improvement": 0.0
+                                            }
+                                          }
+                                        },
+                                        "key": "count",
+                                        "default": 0
+                                      }
+                                    },
+                                    1
+                                  ]
+                                }
+                              },
+                              "total_improvement": {
+                                "$expr": {
+                                  "op": "add",
+                                  "args": [
+                                    {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "op": "ref",
+                                              "path": "vars.acc"
+                                            },
+                                            "key": {
+                                              "$expr": {
+                                                "op": "concat",
+                                                "args": [
+                                                  {
+                                                    "op": "ref",
+                                                    "path": "vars.event.phase_label"
+                                                  },
+                                                  {
+                                                    "op": "ref",
+                                                    "path": "vars.event.response_mode"
+                                                  }
+                                                ],
+                                                "separator": "::"
+                                              }
+                                            },
+                                            "default": {
+                                              "count": 0,
+                                              "total_improvement": 0.0,
+                                              "avg_improvement": 0.0
+                                            }
+                                          }
+                                        },
+                                        "key": "total_improvement",
+                                        "default": 0.0
+                                      }
+                                    },
+                                    {
+                                      "op": "ref",
+                                      "path": "vars.event.improvement"
+                                    }
+                                  ]
+                                }
+                              },
+                              "avg_improvement": {
+                                "$expr": {
+                                  "op": "div",
+                                  "left": {
+                                    "$expr": {
+                                      "op": "add",
+                                      "args": [
+                                        {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "$expr": {
+                                                "op": "get",
+                                                "source": {
+                                                  "op": "ref",
+                                                  "path": "vars.acc"
+                                                },
+                                                "key": {
+                                                  "$expr": {
+                                                    "op": "concat",
+                                                    "args": [
+                                                      {
+                                                        "op": "ref",
+                                                        "path": "vars.event.phase_label"
+                                                      },
+                                                      {
+                                                        "op": "ref",
+                                                        "path": "vars.event.response_mode"
+                                                      }
+                                                    ],
+                                                    "separator": "::"
+                                                  }
+                                                },
+                                                "default": {
+                                                  "count": 0,
+                                                  "total_improvement": 0.0,
+                                                  "avg_improvement": 0.0
+                                                }
+                                              }
+                                            },
+                                            "key": "total_improvement",
+                                            "default": 0.0
+                                          }
+                                        },
+                                        {
+                                          "op": "ref",
+                                          "path": "vars.event.improvement"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "right": {
+                                    "$expr": {
+                                      "op": "add",
+                                      "args": [
+                                        {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "$expr": {
+                                                "op": "get",
+                                                "source": {
+                                                  "op": "ref",
+                                                  "path": "vars.acc"
+                                                },
+                                                "key": {
+                                                  "$expr": {
+                                                    "op": "concat",
+                                                    "args": [
+                                                      {
+                                                        "op": "ref",
+                                                        "path": "vars.event.phase_label"
+                                                      },
+                                                      {
+                                                        "op": "ref",
+                                                        "path": "vars.event.response_mode"
+                                                      }
+                                                    ],
+                                                    "separator": "::"
+                                                  }
                                                 },
                                                 "default": {
                                                   "count": 0,

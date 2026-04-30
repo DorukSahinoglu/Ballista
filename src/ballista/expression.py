@@ -32,6 +32,7 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "pow",
     "mod",
     "abs",
+    "concat",
     "min",
     "max",
     "avg",
@@ -111,6 +112,14 @@ def evaluate_expression(
 
     if operator == "abs":
         return abs(_eval_operand(expression["value"], context, scope))
+
+    if operator == "concat":
+        args = expression.get("args", [])
+        if not isinstance(args, list):
+            raise ValueError("Expression 'concat' expects a list of args")
+        separator = str(_eval_operand(expression.get("separator", ""), context, scope))
+        values = [str(_eval_operand(arg, context, scope)) for arg in args]
+        return separator.join(values)
 
     if operator == "round":
         value = _eval_operand(expression["value"], context, scope)
