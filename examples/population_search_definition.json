@@ -111,6 +111,112 @@
       "default": "neutral"
     },
     {
+      "name": "response_history",
+      "kind": "object_collection",
+      "representation": "response_history",
+      "default": []
+    },
+    {
+      "name": "selection_policy_history",
+      "kind": "object_collection",
+      "representation": "selection_policy_history",
+      "default": []
+    },
+    {
+      "name": "acceptance_policy_history",
+      "kind": "object_collection",
+      "representation": "acceptance_policy_history",
+      "default": []
+    },
+    {
+      "name": "restart_mode_history",
+      "kind": "object_collection",
+      "representation": "restart_mode_history",
+      "default": []
+    },
+    {
+      "name": "response_usage_profile",
+      "kind": "mapping",
+      "representation": "usage_profile",
+      "default": {}
+    },
+    {
+      "name": "selection_policy_usage_profile",
+      "kind": "mapping",
+      "representation": "usage_profile",
+      "default": {}
+    },
+    {
+      "name": "best_score_outcome_history",
+      "kind": "object_collection",
+      "representation": "outcome_history",
+      "default": []
+    },
+    {
+      "name": "response_outcome_events",
+      "kind": "object_collection",
+      "representation": "response_outcome_events",
+      "default": []
+    },
+    {
+      "name": "response_effectiveness_profile",
+      "kind": "mapping",
+      "representation": "effectiveness_profile",
+      "default": {}
+    },
+    {
+      "name": "response_candidates",
+      "kind": "object_collection",
+      "representation": "response_candidates",
+      "default": []
+    },
+    {
+      "name": "response_library",
+      "kind": "object_collection",
+      "representation": "response_library",
+      "default": [
+        {
+          "response_mode": "intensify_response",
+          "response_family": "exploit",
+          "library_tags": ["momentum", "elitist"],
+          "selection_policy": "tournament",
+          "acceptance_policy": "annealed",
+          "restart_mode": "elite_biased",
+          "base_minimum_distance": 0.2,
+          "mutation_multiplier": 0.9,
+          "directional_multiplier": 1.05
+        },
+        {
+          "response_mode": "diversify_response",
+          "response_family": "explore",
+          "library_tags": ["recovery", "uniform_restart"],
+          "selection_policy": "roulette",
+          "acceptance_policy": "diversity_guarded",
+          "restart_mode": "uniform",
+          "base_minimum_distance": 0.45,
+          "mutation_multiplier": 1.2,
+          "directional_multiplier": 0.85
+        },
+        {
+          "response_mode": "stability_response",
+          "response_family": "stabilize",
+          "library_tags": ["memory", "diversity_guard"],
+          "selection_policy": "rank",
+          "acceptance_policy": "diversity_guarded",
+          "restart_mode": "elite_biased",
+          "base_minimum_distance": 0.38,
+          "mutation_multiplier": 0.82,
+          "directional_multiplier": 1.08
+        }
+      ]
+    },
+    {
+      "name": "selected_response_candidate",
+      "kind": "object",
+      "representation": "selected_response_candidate",
+      "default": {}
+    },
+    {
       "name": "population_summary",
       "kind": "object",
       "representation": "population_summary",
@@ -134,6 +240,7 @@
             "type": "operator",
             "name": "set_response_mode",
             "operator": "set_slot_value",
+            "snapshot_keys": ["response_mode"],
             "params": {
               "slot": "response_mode",
               "value": {
@@ -145,6 +252,7 @@
             "type": "operator",
             "name": "set_response_selection_policy",
             "operator": "set_slot_value",
+            "snapshot_keys": ["selection_policy"],
             "params": {
               "slot": "selection_policy",
               "value": {
@@ -156,6 +264,7 @@
             "type": "operator",
             "name": "set_response_acceptance_policy",
             "operator": "set_slot_value",
+            "snapshot_keys": ["acceptance_policy"],
             "params": {
               "slot": "acceptance_policy",
               "value": {
@@ -167,6 +276,7 @@
             "type": "operator",
             "name": "set_response_restart_mode",
             "operator": "set_slot_value",
+            "snapshot_keys": ["restart_mode"],
             "params": {
               "slot": "restart_mode",
               "value": {
@@ -178,6 +288,7 @@
             "type": "operator",
             "name": "set_response_minimum_distance",
             "operator": "set_slot_value",
+            "snapshot_keys": ["minimum_distance"],
             "params": {
               "slot": "minimum_distance",
               "value": {
@@ -189,6 +300,7 @@
             "type": "operator",
             "name": "set_response_mutation_scale",
             "operator": "set_slot_value",
+            "snapshot_keys": ["mutation_scale"],
             "params": {
               "slot": "mutation_scale",
               "value": {
@@ -200,6 +312,7 @@
             "type": "operator",
             "name": "set_response_directional_scale",
             "operator": "set_slot_value",
+            "snapshot_keys": ["directional_scale"],
             "params": {
               "slot": "directional_scale",
               "value": {
@@ -611,6 +724,847 @@
             },
             {
               "type": "operator",
+              "name": "set_response_history",
+              "operator": "set_slot_value",
+              "message": "response mode history refreshed from recent response actions",
+              "snapshot_keys": ["response_history"],
+              "params": {
+                "slot": "response_history",
+                "value": {
+                  "$expr": {
+                    "op": "slot_history",
+                    "slot": "response_mode",
+                    "nodes": ["set_response_mode"],
+                    "window": 4,
+                    "include_current": true
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_selection_policy_history",
+              "operator": "set_slot_value",
+              "message": "selection policy history refreshed from recent response actions",
+              "snapshot_keys": ["selection_policy_history"],
+              "params": {
+                "slot": "selection_policy_history",
+                "value": {
+                  "$expr": {
+                    "op": "slot_history",
+                    "slot": "selection_policy",
+                    "nodes": ["set_response_selection_policy"],
+                    "window": 4,
+                    "include_current": true
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_acceptance_policy_history",
+              "operator": "set_slot_value",
+              "message": "acceptance policy history refreshed from recent response actions",
+              "snapshot_keys": ["acceptance_policy_history"],
+              "params": {
+                "slot": "acceptance_policy_history",
+                "value": {
+                  "$expr": {
+                    "op": "slot_history",
+                    "slot": "acceptance_policy",
+                    "nodes": ["set_response_acceptance_policy"],
+                    "window": 4,
+                    "include_current": true
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_restart_mode_history",
+              "operator": "set_slot_value",
+              "message": "restart mode history refreshed from recent response actions",
+              "snapshot_keys": ["restart_mode_history"],
+              "params": {
+                "slot": "restart_mode_history",
+                "value": {
+                  "$expr": {
+                    "op": "slot_history",
+                    "slot": "restart_mode",
+                    "nodes": ["set_response_restart_mode"],
+                    "window": 4,
+                    "include_current": true
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_response_usage_profile",
+              "operator": "set_slot_value",
+              "message": "response usage counts aggregated from recent response history",
+              "snapshot_keys": ["response_usage_profile"],
+              "params": {
+                "slot": "response_usage_profile",
+                "value": {
+                  "$expr": {
+                    "op": "frequency_map",
+                    "source": {
+                      "$ref": "slots.response_history"
+                    },
+                    "as": "history_item"
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_selection_policy_usage_profile",
+              "operator": "set_slot_value",
+              "message": "selection policy usage counts aggregated from recent policy history",
+              "snapshot_keys": ["selection_policy_usage_profile"],
+              "params": {
+                "slot": "selection_policy_usage_profile",
+                "value": {
+                  "$expr": {
+                    "op": "frequency_map",
+                    "source": {
+                      "$ref": "slots.selection_policy_history"
+                    },
+                    "as": "history_item"
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_response_candidates",
+              "operator": "set_slot_value",
+              "message": "response candidates scored from trend and history channels",
+              "snapshot_keys": ["response_candidates"],
+              "params": {
+                "slot": "response_candidates",
+                "value": {
+                  "$expr": {
+                    "op": "map",
+                    "source": {
+                      "$ref": "slots.response_library"
+                    },
+                    "as": "item",
+                    "value": {
+                      "$expr": {
+                        "op": "merge_objects",
+                        "objects": [
+                          {
+                            "$ref": "vars.item"
+                          },
+                          {
+                            "minimum_distance": {
+                              "$expr": {
+                                "op": "if",
+                                "condition": {
+                                  "$expr": {
+                                    "op": "eq",
+                                    "left": {
+                                      "op": "ref",
+                                      "path": "vars.item.response_mode"
+                                    },
+                                    "right": "diversify_response"
+                                  }
+                                },
+                                "then": {
+                                  "$expr": {
+                                    "op": "max",
+                                    "args": [
+                                      {
+                                        "op": "ref",
+                                        "path": "vars.item.base_minimum_distance"
+                                      },
+                                      {
+                                        "$expr": {
+                                          "op": "mul",
+                                          "args": [
+                                            {
+                                              "$ref": "slots.schedule_progress"
+                                            },
+                                            0.55
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "else": {
+                                  "$ref": "vars.item.base_minimum_distance"
+                                }
+                              }
+                            },
+                            "mutation_scale": {
+                              "$expr": {
+                                "op": "clamp",
+                                "value": {
+                                  "$expr": {
+                                    "op": "mul",
+                                    "args": [
+                                      {
+                                        "$ref": "slots.mutation_scale"
+                                      },
+                                      {
+                                        "op": "ref",
+                                        "path": "vars.item.mutation_multiplier"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "min_value": 0.08,
+                                "max_value": 0.7
+                              }
+                            },
+                            "directional_scale": {
+                              "$expr": {
+                                "op": "clamp",
+                                "value": {
+                                  "$expr": {
+                                    "op": "mul",
+                                    "args": [
+                                      {
+                                        "$ref": "slots.directional_scale"
+                                      },
+                                      {
+                                        "op": "ref",
+                                        "path": "vars.item.directional_multiplier"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "min_value": 0.16,
+                                "max_value": 0.48
+                              }
+                            },
+                            "score_components": {
+                              "momentum_fit": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "and",
+                                      "args": [
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "right": "intensify_response"
+                                        },
+                                        {
+                                          "op": "ref",
+                                          "path": "slots.best_score_trend.is_improving"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "early_phase_fit": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "and",
+                                      "args": [
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "right": "intensify_response"
+                                        },
+                                        {
+                                          "op": "lt",
+                                          "left": {
+                                            "$ref": "slots.schedule_progress"
+                                          },
+                                          "right": 0.5
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "stagnation_fit": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "and",
+                                      "args": [
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "right": "diversify_response"
+                                        },
+                                        {
+                                          "op": "gte",
+                                          "left": {
+                                            "$ref": "slots.best_score_trend.stagnation_steps"
+                                          },
+                                          "right": 1
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "guard_alignment": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "and",
+                                      "args": [
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "right": "diversify_response"
+                                        },
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "$ref": "slots.acceptance_policy"
+                                          },
+                                          "right": "diversity_guarded"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "repeat_diversify_recovery": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "and",
+                                      "args": [
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "right": "stability_response"
+                                        },
+                                        {
+                                          "op": "gte",
+                                          "left": {
+                                            "$expr": {
+                                              "op": "count",
+                                              "source": {
+                                                "$ref": "slots.response_history"
+                                              },
+                                              "as": "history_item",
+                                              "where": {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.history_item"
+                                                },
+                                                "right": "diversify_response"
+                                              }
+                                            }
+                                          },
+                                          "right": 2
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "diversity_stability_fit": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "and",
+                                      "args": [
+                                        {
+                                          "op": "eq",
+                                          "left": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "right": "stability_response"
+                                        },
+                                        {
+                                          "op": "gte",
+                                          "left": {
+                                            "$ref": "slots.diversity_trend.stagnation_steps"
+                                          },
+                                          "right": 2
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "novelty_bonus": {
+                                "$expr": {
+                                  "op": "if",
+                                  "condition": {
+                                    "$expr": {
+                                      "op": "eq",
+                                      "left": {
+                                        "$expr": {
+                                          "op": "get",
+                                          "source": {
+                                            "$ref": "slots.response_usage_profile"
+                                          },
+                                          "key": {
+                                            "op": "ref",
+                                            "path": "vars.item.response_mode"
+                                          },
+                                          "default": 0
+                                        }
+                                      },
+                                      "right": 0
+                                    }
+                                  },
+                                  "then": 1,
+                                  "else": 0
+                                }
+                              },
+                              "response_overuse_penalty": {
+                                "$expr": {
+                                  "op": "get",
+                                  "source": {
+                                    "$ref": "slots.response_usage_profile"
+                                  },
+                                  "key": {
+                                    "op": "ref",
+                                    "path": "vars.item.response_mode"
+                                  },
+                                  "default": 0
+                                }
+                              },
+                              "policy_overuse_penalty": {
+                                "$expr": {
+                                  "op": "get",
+                                  "source": {
+                                    "$ref": "slots.selection_policy_usage_profile"
+                                  },
+                                  "key": {
+                                    "op": "ref",
+                                    "path": "vars.item.selection_policy"
+                                  },
+                                  "default": 0
+                                }
+                              },
+                              "effectiveness_signal": {
+                                "$expr": {
+                                  "op": "get",
+                                  "source": {
+                                    "$expr": {
+                                      "op": "get",
+                                      "source": {
+                                        "$ref": "slots.response_effectiveness_profile"
+                                      },
+                                      "key": {
+                                        "op": "ref",
+                                        "path": "vars.item.response_mode"
+                                      },
+                                      "default": {
+                                        "count": 0,
+                                        "total_improvement": 0.0,
+                                        "avg_improvement": 0.0
+                                      }
+                                    }
+                                  },
+                                  "key": "avg_improvement",
+                                  "default": 0.0
+                                }
+                              }
+                            },
+                            "score": {
+                              "$expr": {
+                                "op": "weighted_sum",
+                                "terms": [
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "and",
+                                            "args": [
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "right": "intensify_response"
+                                              },
+                                              {
+                                                "op": "ref",
+                                                "path": "slots.best_score_trend.is_improving"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 2.0
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "and",
+                                            "args": [
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "right": "intensify_response"
+                                              },
+                                              {
+                                                "op": "lt",
+                                                "left": {
+                                                  "$ref": "slots.schedule_progress"
+                                                },
+                                                "right": 0.5
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 0.8
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "and",
+                                            "args": [
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "right": "diversify_response"
+                                              },
+                                              {
+                                                "op": "gte",
+                                                "left": {
+                                                  "$ref": "slots.best_score_trend.stagnation_steps"
+                                                },
+                                                "right": 1
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 1.5
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "and",
+                                            "args": [
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "right": "diversify_response"
+                                              },
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "$ref": "slots.acceptance_policy"
+                                                },
+                                                "right": "diversity_guarded"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 0.8
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "and",
+                                            "args": [
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "right": "stability_response"
+                                              },
+                                              {
+                                                "op": "gte",
+                                                "left": {
+                                                  "$expr": {
+                                                    "op": "count",
+                                                    "source": {
+                                                      "$ref": "slots.response_history"
+                                                    },
+                                                    "as": "history_item",
+                                                    "where": {
+                                                      "op": "eq",
+                                                      "left": {
+                                                        "op": "ref",
+                                                        "path": "vars.history_item"
+                                                      },
+                                                      "right": "diversify_response"
+                                                    }
+                                                  }
+                                                },
+                                                "right": 2
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 2.4
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "and",
+                                            "args": [
+                                              {
+                                                "op": "eq",
+                                                "left": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "right": "stability_response"
+                                              },
+                                              {
+                                                "op": "gte",
+                                                "left": {
+                                                  "$ref": "slots.diversity_trend.stagnation_steps"
+                                                },
+                                                "right": 2
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 1.1
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "if",
+                                        "condition": {
+                                          "$expr": {
+                                            "op": "eq",
+                                            "left": {
+                                              "$expr": {
+                                                "op": "get",
+                                                "source": {
+                                                  "$ref": "slots.response_usage_profile"
+                                                },
+                                                "key": {
+                                                  "op": "ref",
+                                                  "path": "vars.item.response_mode"
+                                                },
+                                                "default": 0
+                                              }
+                                            },
+                                            "right": 0
+                                          }
+                                        },
+                                        "then": 1,
+                                        "else": 0
+                                      }
+                                    },
+                                    "weight": 0.35
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$ref": "slots.response_usage_profile"
+                                        },
+                                        "key": {
+                                          "op": "ref",
+                                          "path": "vars.item.response_mode"
+                                        },
+                                        "default": 0
+                                      }
+                                    },
+                                    "weight": -0.3
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$ref": "slots.selection_policy_usage_profile"
+                                        },
+                                        "key": {
+                                          "op": "ref",
+                                          "path": "vars.item.selection_policy"
+                                        },
+                                        "default": 0
+                                      }
+                                    },
+                                    "weight": -0.15
+                                  },
+                                  {
+                                    "value": {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "$ref": "slots.response_effectiveness_profile"
+                                            },
+                                            "key": {
+                                              "op": "ref",
+                                              "path": "vars.item.response_mode"
+                                            },
+                                            "default": {
+                                              "count": 0,
+                                              "total_improvement": 0.0,
+                                              "avg_improvement": 0.0
+                                            }
+                                          }
+                                        },
+                                        "key": "avg_improvement",
+                                        "default": 0.0
+                                      }
+                                    },
+                                    "weight": 2.2
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "select_response_candidate",
+              "operator": "set_slot_value",
+              "message": "highest scoring response candidate selected",
+              "snapshot_keys": ["selected_response_candidate"],
+              "params": {
+                "slot": "selected_response_candidate",
+                "value": {
+                  "$expr": {
+                    "op": "max_by",
+                    "source": {
+                      "$ref": "slots.response_candidates"
+                    },
+                    "as": "item",
+                    "value": {
+                      "op": "ref",
+                      "path": "vars.item.score"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "subgraph",
+              "name": "activate_selected_response",
+              "ref": "response_block",
+              "message": "selected response candidate applied",
+              "snapshot_keys": ["response_mode", "selection_policy", "acceptance_policy", "restart_mode"],
+              "params": {
+                "response_mode": {
+                  "$ref": "slots.selected_response_candidate.response_mode"
+                },
+                "selection_policy": {
+                  "$ref": "slots.selected_response_candidate.selection_policy"
+                },
+                "acceptance_policy": {
+                  "$ref": "slots.selected_response_candidate.acceptance_policy"
+                },
+                "restart_mode": {
+                  "$ref": "slots.selected_response_candidate.restart_mode"
+                },
+                "minimum_distance": {
+                  "$ref": "slots.selected_response_candidate.minimum_distance"
+                },
+                "mutation_scale": {
+                  "$ref": "slots.selected_response_candidate.mutation_scale"
+                },
+                "directional_scale": {
+                  "$ref": "slots.selected_response_candidate.directional_scale"
+                }
+              }
+            },
+            {
+              "type": "operator",
               "name": "select_population_batch",
               "operator": "select_population_batch",
               "message": "candidates selected with tournament policy",
@@ -746,6 +1700,271 @@
                 },
                 "output_slot": "population_summary",
                 "best_output_slot": "best"
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_best_score_outcome_history",
+              "operator": "set_slot_value",
+              "message": "best-score outcome deltas refreshed from recent summaries",
+              "snapshot_keys": ["best_score_outcome_history"],
+              "params": {
+                "slot": "best_score_outcome_history",
+                "value": {
+                  "$expr": {
+                    "op": "pairwise_deltas",
+                    "source": {
+                      "$expr": {
+                        "op": "metric_history",
+                        "metric": "best_score",
+                        "nodes": ["summarize_initial_population", "summarize_population"],
+                        "window": 5,
+                        "include_current": true
+                      }
+                    },
+                    "preference": "decrease"
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_response_outcome_events",
+              "operator": "set_slot_value",
+              "message": "response outcome events materialized from response history and score deltas",
+              "snapshot_keys": ["response_outcome_events"],
+              "params": {
+                "slot": "response_outcome_events",
+                "value": {
+                  "$expr": {
+                    "op": "map",
+                    "source": {
+                      "$ref": "slots.response_history"
+                    },
+                    "as": "response_item",
+                    "value": {
+                      "response_mode": {
+                        "op": "ref",
+                        "path": "vars.response_item"
+                      },
+                      "improvement": {
+                        "$expr": {
+                          "op": "get",
+                          "source": {
+                            "$ref": "slots.best_score_outcome_history"
+                          },
+                          "key": {
+                            "op": "ref",
+                            "path": "vars.index"
+                          },
+                          "default": 0.0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "operator",
+              "name": "set_response_effectiveness_profile",
+              "operator": "set_slot_value",
+              "message": "response effectiveness profile aggregated from recent outcome events",
+              "snapshot_keys": ["response_effectiveness_profile"],
+              "params": {
+                "slot": "response_effectiveness_profile",
+                "value": {
+                  "$expr": {
+                    "op": "reduce",
+                    "source": {
+                      "$ref": "slots.response_outcome_events"
+                    },
+                    "as": "event",
+                    "accumulator_as": "acc",
+                    "initial": {},
+                    "value": {
+                      "op": "assoc",
+                      "source": {
+                        "op": "ref",
+                        "path": "vars.acc"
+                      },
+                      "key": {
+                        "op": "ref",
+                        "path": "vars.event.response_mode"
+                      },
+                      "value": {
+                        "$expr": {
+                          "op": "merge_objects",
+                          "objects": [
+                            {
+                              "$expr": {
+                                "op": "get",
+                                "source": {
+                                  "op": "ref",
+                                  "path": "vars.acc"
+                                },
+                                "key": {
+                                  "op": "ref",
+                                  "path": "vars.event.response_mode"
+                                },
+                                "default": {
+                                  "count": 0,
+                                  "total_improvement": 0.0,
+                                  "avg_improvement": 0.0
+                                }
+                              }
+                            },
+                            {
+                              "count": {
+                                "$expr": {
+                                  "op": "add",
+                                  "args": [
+                                    {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "op": "ref",
+                                              "path": "vars.acc"
+                                            },
+                                            "key": {
+                                              "op": "ref",
+                                              "path": "vars.event.response_mode"
+                                            },
+                                            "default": {
+                                              "count": 0,
+                                              "total_improvement": 0.0,
+                                              "avg_improvement": 0.0
+                                            }
+                                          }
+                                        },
+                                        "key": "count",
+                                        "default": 0
+                                      }
+                                    },
+                                    1
+                                  ]
+                                }
+                              },
+                              "total_improvement": {
+                                "$expr": {
+                                  "op": "add",
+                                  "args": [
+                                    {
+                                      "$expr": {
+                                        "op": "get",
+                                        "source": {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "op": "ref",
+                                              "path": "vars.acc"
+                                            },
+                                            "key": {
+                                              "op": "ref",
+                                              "path": "vars.event.response_mode"
+                                            },
+                                            "default": {
+                                              "count": 0,
+                                              "total_improvement": 0.0,
+                                              "avg_improvement": 0.0
+                                            }
+                                          }
+                                        },
+                                        "key": "total_improvement",
+                                        "default": 0.0
+                                      }
+                                    },
+                                    {
+                                      "op": "ref",
+                                      "path": "vars.event.improvement"
+                                    }
+                                  ]
+                                }
+                              },
+                              "avg_improvement": {
+                                "$expr": {
+                                  "op": "div",
+                                  "left": {
+                                    "$expr": {
+                                      "op": "add",
+                                      "args": [
+                                        {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "$expr": {
+                                                "op": "get",
+                                                "source": {
+                                                  "op": "ref",
+                                                  "path": "vars.acc"
+                                                },
+                                                "key": {
+                                                  "op": "ref",
+                                                  "path": "vars.event.response_mode"
+                                                },
+                                                "default": {
+                                                  "count": 0,
+                                                  "total_improvement": 0.0,
+                                                  "avg_improvement": 0.0
+                                                }
+                                              }
+                                            },
+                                            "key": "total_improvement",
+                                            "default": 0.0
+                                          }
+                                        },
+                                        {
+                                          "op": "ref",
+                                          "path": "vars.event.improvement"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "right": {
+                                    "$expr": {
+                                      "op": "add",
+                                      "args": [
+                                        {
+                                          "$expr": {
+                                            "op": "get",
+                                            "source": {
+                                              "$expr": {
+                                                "op": "get",
+                                                "source": {
+                                                  "op": "ref",
+                                                  "path": "vars.acc"
+                                                },
+                                                "key": {
+                                                  "op": "ref",
+                                                  "path": "vars.event.response_mode"
+                                                },
+                                                "default": {
+                                                  "count": 0,
+                                                  "total_improvement": 0.0,
+                                                  "avg_improvement": 0.0
+                                                }
+                                              }
+                                            },
+                                            "key": "count",
+                                            "default": 0
+                                          }
+                                        },
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           ]

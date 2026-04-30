@@ -201,10 +201,16 @@ Bugun desteklenen operatorler:
 - `abs`, `min`, `max`, `avg`, `round`
 - `clamp`, `lerp`
 - `metric_history`, `trend_profile`
+- `slot_history`
+- `max_by`, `min_by`
+- `merge_objects`
 - `len`
 - `get`
+- `assoc`
 - `filter`
 - `map`
+- `frequency_map`
+- `pairwise_deltas`
 - `sort_by`
 - `group_by`
 - `reduce`
@@ -230,6 +236,7 @@ Bugun desteklenen operatorler:
 - `square_patterns`
 - `count`
 - `sum`
+- `weighted_sum`
 
 Bu DSL ile kullanici:
 
@@ -267,6 +274,12 @@ Bu DSL ile kullanici:
 - iterasyona gore mutation scale, bias ve acceptance temperature gibi schedule parametreleri uretebilir
 - son iterasyonlardan metric hafizasi cikarip stagnation ve trend bilgisine gore policy degistirebilir
 - condition + subgraph ile trend'e gore farkli response block'larini cagirabilir
+- response/restart/policy gecmisini slot hafizasi olarak okuyup ikinci seviye dengeleme bloklari calistirabilir
+- birden fazla response adayini skorlayip en uygun response block'unu secen arbitration akislari kurabilir
+- yeniden kullanilabilir response library tanimlayip bu library'den skorlanmis response adaylari turetebilir
+- response adaylarini agirlikli skor bilesenleriyle degerlendirip neden secildigini daha okunur hale getirebilir
+- response ve policy gecmisinden usage profile cikarip ayni response'u fazla kullanmaya karsi penalty/novelty mantigi kurabilir
+- response'larin gecmis iterasyonlarda ne kadar iyilestirme getirdigini outcome/effectiveness memory olarak toplayip buna gore secim yapabilir
 
 Registry tarafinda da artik su tip population operatorleri var:
 

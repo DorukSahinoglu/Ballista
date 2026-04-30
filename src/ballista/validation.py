@@ -561,6 +561,23 @@ def _validate_expression(
                 _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
         return
 
+    if operator == "slot_history":
+        slot_name = expression.get("slot")
+        if not isinstance(slot_name, str) or not slot_name.strip():
+            issues.append(ValidationIssue(path=f"{path}.slot", message="Expression slot_history requires 'slot'"))
+        elif slot_name not in slot_schema:
+            issues.append(
+                ValidationIssue(
+                    path=f"{path}.slot",
+                    message=f"Referenced slot '{slot_name}' is not declared in slot_definitions",
+                    severity="warning",
+                )
+            )
+        for key in ("nodes", "window", "include_current"):
+            if key in expression:
+                _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        return
+
     if operator == "trend_profile":
         if "source" not in expression:
             metric = expression.get("metric")
@@ -601,6 +618,16 @@ def _validate_expression(
             _validate_expression_operand(expression["default"], f"{path}.default", slot_schema, issues)
         return
 
+    if operator == "assoc":
+        for key in ("key", "value"):
+            if key not in expression:
+                issues.append(ValidationIssue(path=f"{path}.{key}", message=f"Expression assoc requires '{key}'"))
+                continue
+            _validate_expression_operand(expression[key], f"{path}.{key}", slot_schema, issues)
+        if "source" in expression:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+        return
+
     if operator in {"filter", "map"}:
         if "source" not in expression:
             issues.append(ValidationIssue(path=f"{path}.source", message=f"Expression {operator} requires 'source'"))
@@ -621,6 +648,54 @@ def _validate_expression(
             )
         else:
             _validate_expression_operand(expression[required_key], f"{path}.{required_key}", slot_schema, issues)
+        return
+
+    if operator == "frequency_map":
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message="Expression frequency_map requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        alias = expression.get("as")
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            issues.append(ValidationIssue(path=f"{path}.as", message="Expression alias must be a string"))
+
+        if "key" in expression:
+            _validate_expression_operand(expression["key"], f"{path}.key", slot_schema, issues)
+        return
+
+    if operator == "pairwise_deltas":
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message="Expression pairwise_deltas requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+        if "preference" in expression:
+            _validate_expression_operand(expression["preference"], f"{path}.preference", slot_schema, issues)
+        return
+
+    if operator in {"max_by", "min_by"}:
+        if "source" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.source", message=f"Expression {operator} requires 'source'"))
+        else:
+            _validate_expression_operand(expression["source"], f"{path}.source", slot_schema, issues)
+
+        alias = expression.get("as")
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            issues.append(ValidationIssue(path=f"{path}.as", message="Expression alias must be a string"))
+
+        if "value" not in expression:
+            issues.append(ValidationIssue(path=f"{path}.value", message=f"Expression {operator} requires 'value'"))
+        else:
+            _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
+        return
+
+    if operator == "merge_objects":
+        objects = expression.get("objects")
+        if not isinstance(objects, list):
+            issues.append(ValidationIssue(path=f"{path}.objects", message="Expression merge_objects requires an 'objects' list"))
+            return
+        for index, item in enumerate(objects):
+            _validate_expression_operand(item, f"{path}.objects[{index}]", slot_schema, issues)
         return
 
     if operator == "sort_by":
@@ -1042,6 +1117,41 @@ def _validate_expression(
                 issues.append(ValidationIssue(path=f"{path}.value", message="Expression sum requires 'value'"))
             else:
                 _validate_expression_operand(expression["value"], f"{path}.value", slot_schema, issues)
+        return
+
+    if operator == "weighted_sum":
+        terms = expression.get("terms")
+        if not isinstance(terms, list):
+            issues.append(ValidationIssue(path=f"{path}.terms", message="Expression weighted_sum requires a 'terms' list"))
+            return
+        for index, term in enumerate(terms):
+            if (
+                isinstance(term, dict)
+                and ("value" in term or "weight" in term or "enabled" in term)
+                and "op" not in term
+                and "$ref" not in term
+                and "$expr" not in term
+            ):
+                if "value" not in term:
+                    issues.append(
+                        ValidationIssue(
+                            path=f"{path}.terms[{index}].value",
+                            message="Expression weighted_sum term requires 'value'",
+                        )
+                    )
+                else:
+                    _validate_expression_operand(term["value"], f"{path}.terms[{index}].value", slot_schema, issues)
+                if "weight" in term:
+                    _validate_expression_operand(term["weight"], f"{path}.terms[{index}].weight", slot_schema, issues)
+                if "enabled" in term:
+                    _validate_expression_operand(
+                        term["enabled"],
+                        f"{path}.terms[{index}].enabled",
+                        slot_schema,
+                        issues,
+                    )
+                continue
+            _validate_expression_operand(term, f"{path}.terms[{index}]", slot_schema, issues)
         return
 
     for key in ("left", "right"):

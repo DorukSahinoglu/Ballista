@@ -21,8 +21,10 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "in",
     "len",
     "get",
+    "assoc",
     "count",
     "sum",
+    "weighted_sum",
     "add",
     "sub",
     "mul",
@@ -37,9 +39,15 @@ SUPPORTED_EXPRESSION_OPERATORS = {
     "clamp",
     "lerp",
     "metric_history",
+    "slot_history",
     "trend_profile",
+    "max_by",
+    "min_by",
+    "merge_objects",
     "filter",
     "map",
+    "frequency_map",
+    "pairwise_deltas",
     "sort_by",
     "group_by",
     "reduce",
@@ -138,6 +146,21 @@ def evaluate_expression(
             include_current=include_current,
         )
 
+    if operator == "slot_history":
+        slot_name = expression.get("slot")
+        if not isinstance(slot_name, str) or not slot_name.strip():
+            raise ValueError("Expression 'slot_history' requires a non-empty slot")
+        nodes = _eval_operand(expression.get("nodes"), context, scope)
+        window = expression.get("window")
+        include_current = bool(_eval_operand(expression.get("include_current", True), context, scope))
+        return _build_slot_history(
+            context=context,
+            slot_name=slot_name,
+            nodes=nodes,
+            window=None if window is None else int(_eval_operand(window, context, scope)),
+            include_current=include_current,
+        )
+
     if operator == "trend_profile":
         source = expression.get("source")
         if source is None:
@@ -168,8 +191,23 @@ def evaluate_expression(
         if isinstance(source, dict):
             return deepcopy(source.get(key, default))
         if isinstance(source, list):
-            return deepcopy(source[int(key)])
+            index = int(key)
+            if -len(source) <= index < len(source):
+                return deepcopy(source[index])
+            return deepcopy(default)
         return deepcopy(getattr(source, key, default))
+
+    if operator == "assoc":
+        source = _eval_operand(expression.get("source", {}), context, scope)
+        key = _eval_operand(expression["key"], context, scope)
+        value = _eval_operand(expression["value"], context, scope)
+        if source is None:
+            source = {}
+        if not isinstance(source, dict):
+            raise TypeError("Expression 'assoc' expects an object source")
+        updated = deepcopy(source)
+        updated[str(key)] = value
+        return updated
 
     if operator in {"filter", "map"}:
         source = _eval_operand(expression["source"], context, scope)
@@ -193,6 +231,90 @@ def evaluate_expression(
             transformed.append(_eval_operand(expression["value"], context, nested_scope))
 
         return transformed
+
+    if operator == "pairwise_deltas":
+        source = _eval_operand(expression["source"], context, scope)
+        if not isinstance(source, list):
+            raise TypeError("Expression 'pairwise_deltas' expects a list source")
+        if len(source) < 2:
+            return []
+
+        preference = str(_eval_operand(expression.get("preference", "decrease"), context, scope))
+        if preference not in {"decrease", "increase"}:
+            raise ValueError("Expression 'pairwise_deltas' preference must be 'decrease' or 'increase'")
+
+        deltas = []
+        for index in range(1, len(source)):
+            previous = source[index - 1]
+            current = source[index]
+            delta = previous - current if preference == "decrease" else current - previous
+            deltas.append(delta)
+        return deltas
+
+    if operator == "frequency_map":
+        source = _eval_operand(expression["source"], context, scope)
+        alias = expression.get("as", "item")
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError("Expression 'frequency_map' expects a non-empty alias")
+        if not isinstance(source, list):
+            raise TypeError("Expression 'frequency_map' expects a list source")
+
+        key_expression = expression.get("key")
+        counts: dict[str, int] = {}
+        for index, item in enumerate(source):
+            nested_scope = dict(scope)
+            nested_scope[alias] = item
+            nested_scope["index"] = index
+            key_value = item if key_expression is None else _eval_operand(key_expression, context, nested_scope)
+            key = str(key_value)
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    if operator in {"max_by", "min_by"}:
+        source = _eval_operand(expression["source"], context, scope)
+        alias = expression.get("as", "item")
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError(f"Expression '{operator}' expects a non-empty alias")
+        if not isinstance(source, list):
+            raise TypeError(f"Expression '{operator}' expects a list source")
+        if not source:
+            return None
+
+        selected_item = None
+        selected_score = None
+        for index, item in enumerate(source):
+            nested_scope = dict(scope)
+            nested_scope[alias] = item
+            nested_scope["index"] = index
+            score = _eval_operand(expression["value"], context, nested_scope)
+            if selected_item is None:
+                selected_item = deepcopy(item)
+                selected_score = score
+                continue
+
+            is_better = score > selected_score if operator == "max_by" else score < selected_score
+            if is_better:
+                selected_item = deepcopy(item)
+                selected_score = score
+
+        return selected_item
+
+    if operator == "merge_objects":
+        raw_objects = expression.get("objects")
+        if not isinstance(raw_objects, list):
+            raise ValueError("Expression 'merge_objects' expects an 'objects' list")
+
+        merged: dict[str, Any] = {}
+        for index, item in enumerate(raw_objects):
+            resolved = _eval_operand(item, context, scope)
+            if resolved is None:
+                continue
+            if not isinstance(resolved, dict):
+                raise TypeError(
+                    f"Expression 'merge_objects' expects object entries, got {type(resolved).__name__} at index {index}"
+                )
+            merged.update(deepcopy(resolved))
+        return merged
 
     if operator == "sort_by":
         source = _eval_operand(expression["source"], context, scope)
@@ -746,6 +868,36 @@ def evaluate_expression(
             nested_scope[alias] = item
             nested_scope["index"] = index
             total += _eval_operand(value_expr, context, nested_scope)
+        return total
+
+    if operator == "weighted_sum":
+        terms = expression.get("terms")
+        if not isinstance(terms, list):
+            raise ValueError("Expression 'weighted_sum' expects a 'terms' list")
+
+        total = 0.0
+        for index, term in enumerate(terms):
+            term_operand = term
+            enabled = True
+            weight = 1.0
+
+            if (
+                isinstance(term, dict)
+                and ("value" in term or "weight" in term or "enabled" in term)
+                and "op" not in term
+                and "$ref" not in term
+                and "$expr" not in term
+            ):
+                if "value" not in term:
+                    raise ValueError(f"Expression 'weighted_sum' term at index {index} requires 'value'")
+                term_operand = term["value"]
+                enabled = bool(_eval_operand(term.get("enabled", True), context, scope))
+                weight = _eval_operand(term.get("weight", 1.0), context, scope)
+
+            if not enabled:
+                continue
+
+            total += _eval_operand(term_operand, context, scope) * weight
         return total
 
     if operator in {"add", "mul", "min", "max", "avg"}:
@@ -1983,6 +2135,41 @@ def _build_metric_history(
 
     if include_current and metric_name in context.metrics:
         values.append(deepcopy(context.metrics[metric_name]))
+
+    if window is not None:
+        values = values[-window:]
+    return values
+
+
+def _build_slot_history(
+    context: BallistaContext,
+    slot_name: str,
+    nodes: Any,
+    window: int | None,
+    include_current: bool,
+) -> list[Any]:
+    if window is not None and window <= 0:
+        raise ValueError("slot_history window must be > 0")
+
+    allowed_nodes: set[str] | None = None
+    if nodes is not None:
+        if isinstance(nodes, str):
+            allowed_nodes = {nodes}
+        elif isinstance(nodes, list) and all(isinstance(item, str) for item in nodes):
+            allowed_nodes = set(nodes)
+        else:
+            raise TypeError("slot_history nodes must be a string or list of strings")
+
+    values = []
+    for record in context.history:
+        if allowed_nodes is not None and record.node not in allowed_nodes:
+            continue
+        if slot_name not in record.snapshot:
+            continue
+        values.append(deepcopy(record.snapshot[slot_name]))
+
+    if include_current and slot_name in context.slots:
+        values.append(deepcopy(context.slots[slot_name]))
 
     if window is not None:
         values = values[-window:]

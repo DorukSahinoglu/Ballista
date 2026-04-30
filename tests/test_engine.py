@@ -2191,6 +2191,660 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(result.get("acceptance_policy"), "diversity_guarded")
         self.assertEqual(result.get("restart_mode"), "uniform")
 
+    def test_expression_supports_slot_history(self) -> None:
+        definition = {
+            "name": "slot_history_definition",
+            "slot_definitions": [
+                {
+                    "name": "response_mode",
+                    "kind": "scalar",
+                    "representation": "response_mode",
+                    "default": "neutral",
+                },
+                {
+                    "name": "response_history",
+                    "kind": "object_collection",
+                    "representation": "response_history",
+                    "default": [],
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_response_mode_first",
+                        "operator": "set_slot_value",
+                        "snapshot_keys": ["response_mode"],
+                        "params": {"slot": "response_mode", "value": "diversify_response"},
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_response_mode_second",
+                        "operator": "set_slot_value",
+                        "snapshot_keys": ["response_mode"],
+                        "params": {"slot": "response_mode", "value": "stability_response"},
+                    },
+                    {
+                        "type": "operator",
+                        "name": "set_response_history",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "response_history",
+                            "value": {
+                                "$expr": {
+                                    "op": "slot_history",
+                                    "slot": "response_mode",
+                                    "nodes": ["set_response_mode_first", "set_response_mode_second"],
+                                    "window": 3,
+                                    "include_current": True,
+                                }
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(
+            result.get("response_history"),
+            ["diversify_response", "stability_response", "stability_response"],
+        )
+
+    def test_expression_supports_max_by_for_response_arbitration(self) -> None:
+        definition = {
+            "name": "response_arbitration_definition",
+            "slot_definitions": [
+                {
+                    "name": "response_candidates",
+                    "kind": "object_collection",
+                    "representation": "response_candidates",
+                    "default": [],
+                },
+                {
+                    "name": "selected_response_candidate",
+                    "kind": "object",
+                    "representation": "selected_response_candidate",
+                    "default": {},
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_response_candidates",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "response_candidates",
+                            "value": [
+                                {"response_mode": "intensify_response", "score": 1.2},
+                                {"response_mode": "diversify_response", "score": 2.4},
+                                {"response_mode": "stability_response", "score": 1.8},
+                            ],
+                        },
+                    },
+                    {
+                        "type": "operator",
+                        "name": "select_response_candidate",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "selected_response_candidate",
+                            "value": {
+                                "$expr": {
+                                    "op": "max_by",
+                                    "source": {"$ref": "slots.response_candidates"},
+                                    "as": "item",
+                                    "value": {"op": "ref", "path": "vars.item.score"},
+                                }
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("selected_response_candidate")["response_mode"], "diversify_response")
+        self.assertEqual(result.get("selected_response_candidate")["score"], 2.4)
+
+    def test_expression_supports_merge_objects_for_response_library_materialization(self) -> None:
+        definition = {
+            "name": "merge_objects_definition",
+            "slot_definitions": [
+                {
+                    "name": "response_library",
+                    "kind": "object_collection",
+                    "representation": "response_library",
+                    "default": [{"response_mode": "intensify_response", "selection_policy": "rank"}],
+                },
+                {
+                    "name": "response_candidates",
+                    "kind": "object_collection",
+                    "representation": "response_candidates",
+                    "default": [],
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_response_candidates",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "response_candidates",
+                            "value": {
+                                "$expr": {
+                                    "op": "map",
+                                    "source": {"$ref": "slots.response_library"},
+                                    "as": "item",
+                                    "value": {
+                                        "$expr": {
+                                            "op": "merge_objects",
+                                            "objects": [
+                                                {"$ref": "vars.item"},
+                                                {"score": 2.2, "restart_mode": "elite_biased"},
+                                            ],
+                                        }
+                                    },
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(
+            result.get("response_candidates")[0],
+            {
+                "response_mode": "intensify_response",
+                "selection_policy": "rank",
+                "score": 2.2,
+                "restart_mode": "elite_biased",
+            },
+        )
+
+    def test_expression_supports_weighted_sum_for_response_scoring(self) -> None:
+        definition = {
+            "name": "weighted_sum_definition",
+            "slot_definitions": [
+                {
+                    "name": "response_score",
+                    "kind": "scalar",
+                    "representation": "response_score",
+                    "default": 0.0,
+                }
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_response_score",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "response_score",
+                            "value": {
+                                "$expr": {
+                                    "op": "weighted_sum",
+                                    "terms": [
+                                        {"value": 1, "weight": 2.0},
+                                        {"value": 1, "weight": 0.4, "enabled": False},
+                                        {
+                                            "value": {
+                                                "$expr": {
+                                                    "op": "if",
+                                                    "condition": True,
+                                                    "then": 1,
+                                                    "else": 0,
+                                                }
+                                            },
+                                            "weight": 0.2,
+                                        },
+                                    ],
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("response_score"), 2.2)
+
+    def test_expression_supports_frequency_map_for_usage_profiles(self) -> None:
+        definition = {
+            "name": "frequency_map_definition",
+            "slot_definitions": [
+                {
+                    "name": "response_history",
+                    "kind": "object_collection",
+                    "representation": "response_history",
+                    "default": ["diversify_response", "stability_response", "diversify_response"],
+                },
+                {
+                    "name": "response_usage_profile",
+                    "kind": "mapping",
+                    "representation": "usage_profile",
+                    "default": {},
+                },
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_usage_profile",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "response_usage_profile",
+                            "value": {
+                                "$expr": {
+                                    "op": "frequency_map",
+                                    "source": {"$ref": "slots.response_history"},
+                                    "as": "item",
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(
+            result.get("response_usage_profile"),
+            {"diversify_response": 2, "stability_response": 1},
+        )
+
+    def test_expression_supports_pairwise_deltas_for_outcome_history(self) -> None:
+        definition = {
+            "name": "pairwise_deltas_definition",
+            "slot_definitions": [
+                {
+                    "name": "outcomes",
+                    "kind": "object_collection",
+                    "representation": "outcome_history",
+                    "default": [],
+                }
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_outcomes",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "outcomes",
+                            "value": {
+                                "$expr": {
+                                    "op": "pairwise_deltas",
+                                    "source": [1.2, 0.9, 0.75, 0.8],
+                                    "preference": "decrease",
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("outcomes"), [0.29999999999999993, 0.15000000000000002, -0.050000000000000044])
+
+    def test_expression_get_uses_default_for_out_of_range_list_index(self) -> None:
+        definition = {
+            "name": "get_list_default_definition",
+            "slot_definitions": [
+                {
+                    "name": "value",
+                    "kind": "scalar",
+                    "representation": "defaulted_value",
+                    "default": 0,
+                }
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_value",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "value",
+                            "value": {
+                                "$expr": {
+                                    "op": "get",
+                                    "source": [1, 2],
+                                    "key": 5,
+                                    "default": 9,
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("value"), 9)
+
+    def test_expression_supports_assoc_for_effectiveness_aggregation(self) -> None:
+        definition = {
+            "name": "assoc_definition",
+            "slot_definitions": [
+                {
+                    "name": "profile",
+                    "kind": "mapping",
+                    "representation": "effectiveness_profile",
+                    "default": {},
+                }
+            ],
+            "root": {
+                "type": "sequence",
+                "name": "root_sequence",
+                "steps": [
+                    {
+                        "type": "operator",
+                        "name": "set_profile",
+                        "operator": "set_slot_value",
+                        "params": {
+                            "slot": "profile",
+                            "value": {
+                                "$expr": {
+                                    "op": "reduce",
+                                    "source": [
+                                        {"response_mode": "intensify_response", "improvement": 0.4},
+                                        {"response_mode": "intensify_response", "improvement": 0.2},
+                                    ],
+                                    "as": "event",
+                                    "accumulator_as": "acc",
+                                    "initial": {},
+                                    "value": {
+                                        "op": "assoc",
+                                        "source": {"op": "ref", "path": "vars.acc"},
+                                        "key": {"op": "ref", "path": "vars.event.response_mode"},
+                                        "value": {
+                                            "$expr": {
+                                                "op": "merge_objects",
+                                                "objects": [
+                                                    {
+                                                        "$expr": {
+                                                            "op": "get",
+                                                            "source": {"op": "ref", "path": "vars.acc"},
+                                                            "key": {"op": "ref", "path": "vars.event.response_mode"},
+                                                            "default": {
+                                                                "count": 0,
+                                                                "total_improvement": 0.0,
+                                                            },
+                                                        }
+                                                    },
+                                                    {
+                                                        "count": {
+                                                            "$expr": {
+                                                                "op": "add",
+                                                                "args": [
+                                                                    {
+                                                                        "$expr": {
+                                                                            "op": "get",
+                                                                            "source": {
+                                                                                "$expr": {
+                                                                                    "op": "get",
+                                                                                    "source": {"op": "ref", "path": "vars.acc"},
+                                                                                    "key": {"op": "ref", "path": "vars.event.response_mode"},
+                                                                                    "default": {
+                                                                                        "count": 0,
+                                                                                        "total_improvement": 0.0,
+                                                                                    },
+                                                                                }
+                                                                            },
+                                                                            "key": "count",
+                                                                            "default": 0,
+                                                                        }
+                                                                    },
+                                                                    1,
+                                                                ],
+                                                            }
+                                                        },
+                                                        "total_improvement": {
+                                                            "$expr": {
+                                                                "op": "add",
+                                                                "args": [
+                                                                    {
+                                                                        "$expr": {
+                                                                            "op": "get",
+                                                                            "source": {
+                                                                                "$expr": {
+                                                                                    "op": "get",
+                                                                                    "source": {"op": "ref", "path": "vars.acc"},
+                                                                                    "key": {"op": "ref", "path": "vars.event.response_mode"},
+                                                                                    "default": {
+                                                                                        "count": 0,
+                                                                                        "total_improvement": 0.0,
+                                                                                    },
+                                                                                }
+                                                                            },
+                                                                            "key": "total_improvement",
+                                                                            "default": 0.0,
+                                                                        }
+                                                                    },
+                                                                    {"op": "ref", "path": "vars.event.improvement"},
+                                                                ],
+                                                            }
+                                                        },
+                                                    },
+                                                ],
+                                            }
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(
+            result.get("profile"),
+            {"intensify_response": {"count": 2, "total_improvement": 0.6000000000000001}},
+        )
+
+    def test_condition_and_subgraph_support_stability_response_after_repeated_diversify(self) -> None:
+        definition = {
+            "name": "stability_response_definition",
+            "slot_definitions": [
+                {
+                    "name": "response_mode",
+                    "kind": "scalar",
+                    "representation": "response_mode",
+                    "default": "diversify_response",
+                },
+                {
+                    "name": "response_history",
+                    "kind": "object_collection",
+                    "representation": "response_history",
+                    "default": ["diversify_response", "diversify_response"],
+                },
+                {
+                    "name": "selection_policy",
+                    "kind": "scalar",
+                    "representation": "selection_policy",
+                    "default": "roulette",
+                },
+                {
+                    "name": "acceptance_policy",
+                    "kind": "scalar",
+                    "representation": "acceptance_policy",
+                    "default": "diversity_guarded",
+                },
+                {
+                    "name": "restart_mode",
+                    "kind": "scalar",
+                    "representation": "restart_mode",
+                    "default": "uniform",
+                },
+                {
+                    "name": "minimum_distance",
+                    "kind": "scalar",
+                    "representation": "minimum_distance",
+                    "default": 0.45,
+                },
+                {
+                    "name": "mutation_scale",
+                    "kind": "scalar",
+                    "representation": "mutation_scale",
+                    "default": 0.32,
+                },
+                {
+                    "name": "directional_scale",
+                    "kind": "scalar",
+                    "representation": "directional_scale",
+                    "default": 0.28,
+                },
+            ],
+            "subgraphs": [
+                {
+                    "name": "response_block",
+                    "node": {
+                        "type": "sequence",
+                        "name": "response_block_sequence",
+                        "steps": [
+                            {
+                                "type": "operator",
+                                "name": "set_response_mode",
+                                "operator": "set_slot_value",
+                                "params": {"slot": "response_mode", "value": {"$ref": "args.response_mode"}},
+                            },
+                            {
+                                "type": "operator",
+                                "name": "set_response_selection",
+                                "operator": "set_slot_value",
+                                "params": {"slot": "selection_policy", "value": {"$ref": "args.selection_policy"}},
+                            },
+                            {
+                                "type": "operator",
+                                "name": "set_response_acceptance",
+                                "operator": "set_slot_value",
+                                "params": {"slot": "acceptance_policy", "value": {"$ref": "args.acceptance_policy"}},
+                            },
+                            {
+                                "type": "operator",
+                                "name": "set_response_restart",
+                                "operator": "set_slot_value",
+                                "params": {"slot": "restart_mode", "value": {"$ref": "args.restart_mode"}},
+                            },
+                        ],
+                    },
+                }
+            ],
+            "root": {
+                "type": "condition",
+                "name": "stabilize_after_repeated_diversify",
+                "condition": {
+                    "expression": {
+                        "op": "gte",
+                        "left": {
+                            "op": "count",
+                            "source": {"$ref": "slots.response_history"},
+                            "as": "item",
+                            "where": {
+                                "op": "eq",
+                                "left": {"op": "ref", "path": "vars.item"},
+                                "right": "diversify_response",
+                            },
+                        },
+                        "right": 2,
+                    }
+                },
+                "then": {
+                    "type": "subgraph",
+                    "name": "activate_stability_response",
+                    "ref": "response_block",
+                    "params": {
+                        "response_mode": "stability_response",
+                        "selection_policy": "rank",
+                        "acceptance_policy": "diversity_guarded",
+                        "restart_mode": "elite_biased",
+                    },
+                },
+            },
+        }
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertEqual(result.get("response_mode"), "stability_response")
+        self.assertEqual(result.get("selection_policy"), "rank")
+        self.assertEqual(result.get("acceptance_policy"), "diversity_guarded")
+        self.assertEqual(result.get("restart_mode"), "elite_biased")
+
     def test_validator_reports_unknown_subgraph_reference(self) -> None:
         invalid_definition = {
             "name": "invalid_subgraph_definition",
@@ -2332,7 +2986,15 @@ class EngineTests(unittest.TestCase):
         self.assertIn("clamp", contract["supported_expression_operators"])
         self.assertIn("lerp", contract["supported_expression_operators"])
         self.assertIn("metric_history", contract["supported_expression_operators"])
+        self.assertIn("slot_history", contract["supported_expression_operators"])
         self.assertIn("trend_profile", contract["supported_expression_operators"])
+        self.assertIn("merge_objects", contract["supported_expression_operators"])
+        self.assertIn("weighted_sum", contract["supported_expression_operators"])
+        self.assertIn("frequency_map", contract["supported_expression_operators"])
+        self.assertIn("pairwise_deltas", contract["supported_expression_operators"])
+        self.assertIn("assoc", contract["supported_expression_operators"])
+        self.assertIn("max_by", contract["supported_expression_operators"])
+        self.assertIn("min_by", contract["supported_expression_operators"])
         self.assertIn("matrix_degrees", contract["supported_expression_operators"])
         self.assertIn("connected_components", contract["supported_expression_operators"])
         self.assertIn("shortest_path", contract["supported_expression_operators"])
