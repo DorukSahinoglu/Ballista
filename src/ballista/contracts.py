@@ -9,6 +9,147 @@ from .registry import OperatorParamSchema, OperatorRegistry, OperatorSpec
 
 SUPPORTED_NODE_TYPES = ["operator", "sequence", "loop", "condition", "subgraph"]
 SUPPORTED_REFERENCE_ROOTS = ["slots", "metrics", "schema", "iteration", "args", "vars"]
+EXPRESSION_OPERATOR_CATEGORIES = {
+    "references_and_logic": {
+        "ref",
+        "if",
+        "eq",
+        "neq",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "and",
+        "or",
+        "not",
+        "contains",
+        "in",
+        "len",
+        "get",
+        "assoc",
+    },
+    "math_and_scoring": {
+        "sum",
+        "weighted_sum",
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "pow",
+        "mod",
+        "abs",
+        "min",
+        "max",
+        "avg",
+        "round",
+        "clamp",
+        "lerp",
+    },
+    "history_and_learning": {
+        "metric_history",
+        "slot_history",
+        "trend_profile",
+        "frequency_map",
+        "pairwise_deltas",
+    },
+    "collection_transforms": {
+        "merge_objects",
+        "filter",
+        "map",
+        "sort_by",
+        "group_by",
+        "reduce",
+        "sliding_window",
+        "count",
+        "max_by",
+        "min_by",
+        "concat",
+    },
+    "graph_and_matrix": {
+        "neighbors_of",
+        "matrix_degrees",
+        "connected_components",
+        "edge_pairs",
+        "edge_strength_profile",
+        "neighborhood_overlap",
+        "reachable_within",
+        "shortest_path",
+        "weighted_shortest_path",
+        "propagate_signal",
+        "random_walk",
+        "flow_profile",
+        "triangle_patterns",
+        "centrality_profile",
+        "closeness_profile",
+        "policy_walk",
+        "weighted_policy_walk",
+        "star_patterns",
+        "square_patterns",
+    },
+}
+AUTHORING_STARTER_TEMPLATES = [
+    {
+        "name": "simple_operator_step",
+        "label": "Simple Operator Step",
+        "node_type": "operator",
+        "template": {
+            "type": "operator",
+            "name": "set_value",
+            "operator": "set_slot_value",
+            "params": {"slot": "", "value": None},
+        },
+    },
+    {
+        "name": "formula_assignment",
+        "label": "Formula Assignment",
+        "node_type": "operator",
+        "template": {
+            "type": "operator",
+            "name": "set_formula_value",
+            "operator": "set_slot_value",
+            "params": {"slot": "", "value": {"$expr": {"op": "add", "args": [0, 0]}}},
+        },
+    },
+    {
+        "name": "condition_branch",
+        "label": "Condition Branch",
+        "node_type": "condition",
+        "template": {
+            "type": "condition",
+            "name": "branch_on_signal",
+            "condition": {
+                "kind": "comparison",
+                "operator": "eq",
+                "left": {"$ref": "slots.search_mode"},
+                "right": "intensify",
+            },
+            "then": {"type": "sequence", "name": "then_branch", "steps": []},
+            "else": {"type": "sequence", "name": "else_branch", "steps": []},
+        },
+    },
+    {
+        "name": "iterative_loop",
+        "label": "Iterative Loop",
+        "node_type": "loop",
+        "template": {
+            "type": "loop",
+            "name": "main_loop",
+            "max_iterations": 10,
+            "body": {"type": "sequence", "name": "loop_body", "steps": []},
+        },
+    },
+    {
+        "name": "reusable_subgraph",
+        "label": "Reusable Subgraph",
+        "node_type": "subgraph",
+        "template": {
+            "type": "subgraph",
+            "name": "call_reusable_block",
+            "ref": "custom_block",
+            "params": {},
+        },
+    },
+]
 
 
 @dataclass(slots=True)
@@ -45,6 +186,12 @@ def build_editor_contract(
     base["compatibility"] = {
         spec.name: _operator_compatibility(spec, slot_schema)
         for spec in registry.operators.values()
+    }
+    base["authoring"] = {
+        "expression_categories": _build_expression_categories(),
+        "operator_categories": _build_operator_categories(registry),
+        "slot_groups": _build_slot_groups(slot_schema),
+        "starter_templates": list(AUTHORING_STARTER_TEMPLATES),
     }
     return base
 
@@ -98,3 +245,64 @@ def _operator_compatibility(
             "compatible_slots": [asdict(item) for item in find_compatible_slots(param, slot_schema)],
         }
     return compatibility
+
+
+def _build_expression_categories() -> list[dict[str, Any]]:
+    categorized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for category_name, operators in EXPRESSION_OPERATOR_CATEGORIES.items():
+        names = sorted(operators)
+        seen.update(names)
+        categorized.append({"name": category_name, "operators": names})
+
+    uncategorized = sorted(SUPPORTED_EXPRESSION_OPERATORS - seen)
+    if uncategorized:
+        categorized.append({"name": "other", "operators": uncategorized})
+    return categorized
+
+
+def _build_operator_categories(registry: OperatorRegistry) -> list[dict[str, Any]]:
+    grouped: dict[str, list[str]] = {
+        "core_slots": [],
+        "graph_and_matrix": [],
+        "population_search": [],
+        "constructive_search": [],
+        "analysis_and_memory": [],
+    }
+    for spec in registry.operators.values():
+        grouped[_infer_operator_category(spec.name)].append(spec.name)
+
+    return [
+        {"name": category, "operators": sorted(names)}
+        for category, names in grouped.items()
+        if names
+    ]
+
+
+def _build_slot_groups(slot_schema: dict[str, SlotDefinition]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for definition in slot_schema.values():
+        grouped.setdefault(definition.kind, []).append(
+            {
+                "name": definition.name,
+                "representation": definition.representation,
+                "metadata": definition.metadata,
+            }
+        )
+
+    return [
+        {"kind": kind, "slots": sorted(slots, key=lambda item: item["name"])}
+        for kind, slots in sorted(grouped.items())
+    ]
+
+
+def _infer_operator_category(name: str) -> str:
+    if name.startswith(("set_", "update_")):
+        return "core_slots"
+    if any(token in name for token in ("population", "selection", "mutation", "recombine", "accept", "restart")):
+        return "population_search"
+    if any(token in name for token in ("matrix", "graph", "neighbor", "path", "flow", "signal", "walk")):
+        return "graph_and_matrix"
+    if any(token in name for token in ("summary", "credit", "blame", "profile", "history")):
+        return "analysis_and_memory"
+    return "constructive_search"

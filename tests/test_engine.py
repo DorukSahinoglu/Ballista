@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 
 from ballista import (
     Algorithm,
@@ -2755,6 +2757,44 @@ class EngineTests(unittest.TestCase):
             {"intensify_response": {"count": 2, "total_improvement": 0.6000000000000001}},
         )
 
+    def test_population_demo_definition_runs_with_regime_profiles(self) -> None:
+        definition_path = Path(__file__).resolve().parents[1] / "examples" / "population_search_definition.json"
+        definition = json.loads(definition_path.read_text(encoding="utf-8"))
+
+        loaded = load_algorithm_definition(definition, build_builtin_registry())
+        result = AlgorithmEngine().run(
+            loaded.algorithm,
+            initial_slots=loaded.initial_slots,
+            slot_schema=loaded.slot_schema,
+        )
+
+        self.assertIn(result.get("regime_label"), {"score_momentum", "balanced_momentum", "stagnation", "recovery", "drift"})
+        self.assertIsInstance(result.get("regime_history"), list)
+        self.assertIsInstance(result.get("regime_response_effectiveness_profile"), dict)
+        self.assertEqual(result.get("problem_family"), "continuous_population_search")
+        self.assertIsInstance(result.get("response_credit_profile"), dict)
+        self.assertIsInstance(result.get("response_blame_profile"), dict)
+        self.assertIsInstance(result.get("delayed_response_credit_profile"), dict)
+        self.assertIsInstance(result.get("delayed_response_blame_profile"), dict)
+        self.assertIsInstance(result.get("current_regime_response_balance_profile"), dict)
+        self.assertIsInstance(result.get("current_regime_response_family_balance_profile"), dict)
+        self.assertIsInstance(result.get("online_library_weight_profile"), dict)
+        self.assertIsInstance(result.get("mixed_response_library"), list)
+        self.assertGreater(len(result.get("response_credit_profile")), 0)
+        self.assertGreater(len(result.get("response_blame_profile")), 0)
+        self.assertGreater(len(result.get("delayed_response_credit_profile")), 0)
+        self.assertGreater(len(result.get("delayed_response_blame_profile")), 0)
+        self.assertGreater(len(result.get("current_regime_response_balance_profile")), 0)
+        self.assertGreater(len(result.get("current_regime_response_family_balance_profile")), 0)
+        self.assertGreater(len(result.get("online_library_weight_profile")), 0)
+        self.assertIsInstance(result.get("online_exploration_signal"), float)
+        self.assertGreaterEqual(result.get("online_exploration_signal"), 0.0)
+        self.assertLessEqual(result.get("online_exploration_signal"), 1.0)
+        self.assertIn(result.get("exploration_quota"), {0, 1})
+        self.assertIsInstance(result.get("active_response_library"), list)
+        self.assertGreater(len(result.get("mixed_response_library")), 0)
+        self.assertGreater(len(result.get("active_response_library")), 0)
+
     def test_condition_and_subgraph_support_stability_response_after_repeated_diversify(self) -> None:
         definition = {
             "name": "stability_response_definition",
@@ -3000,6 +3040,16 @@ class EngineTests(unittest.TestCase):
         ]
         self.assertEqual(compatible_slots[0]["name"], "affinity_matrix")
         self.assertEqual(contract["supported_node_types"], ["operator", "sequence", "loop", "condition", "subgraph"])
+        self.assertIn("authoring", contract)
+        expression_categories = {item["name"]: item["operators"] for item in contract["authoring"]["expression_categories"]}
+        self.assertIn("reduce", expression_categories["collection_transforms"])
+        self.assertIn("weighted_shortest_path", expression_categories["graph_and_matrix"])
+        operator_categories = {item["name"]: item["operators"] for item in contract["authoring"]["operator_categories"]}
+        self.assertIn("set_slot_value", operator_categories["core_slots"])
+        slot_groups = {item["kind"]: item["slots"] for item in contract["authoring"]["slot_groups"]}
+        self.assertEqual(slot_groups["matrix"][0]["name"], "affinity_matrix")
+        starter_template_names = [item["name"] for item in contract["authoring"]["starter_templates"]]
+        self.assertIn("formula_assignment", starter_template_names)
 
     def test_find_compatible_slots_filters_by_kind(self) -> None:
         registry = build_builtin_registry()

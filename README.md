@@ -281,7 +281,19 @@ Bu DSL ile kullanici:
 - response adaylarini agirlikli skor bilesenleriyle degerlendirip neden secildigini daha okunur hale getirebilir
 - response ve policy gecmisinden usage profile cikarip ayni response'u fazla kullanmaya karsi penalty/novelty mantigi kurabilir
 - response'larin gecmis iterasyonlarda ne kadar iyilestirme getirdigini outcome/effectiveness memory olarak toplayip buna gore secim yapabilir
+- response outcome'larini baglamsal krediye cevirip `response_credit_profile` olarak saklayabilir
+- zayif veya tikanan outcome'lari `response_blame_profile` olarak ayri negatif hafizada toplayabilir
+- response'un etkisini sonraki 1-2 adimlik iyilestirmelerle baglayip `delayed_response_credit_profile` olarak gecikmeli kredi tutabilir
+- response'un sonraki 1-2 adimda biraktigi zayif izi `delayed_response_blame_profile` ile gecikmeli negatif hafizada tutabilir
+- ayni response'un mevcut rejimdeki odul-ceza dengesini `current_regime_response_balance_profile` ile ayri takip edebilir
+- response ailelerinin (`exploit / explore / stabilize`) mevcut rejimdeki toplu dengesini `current_regime_response_family_balance_profile` ile ayri tutabilir
 - ayni response'un erken/orta/gec fazlarda farkli etkisini ayri phase-aware effectiveness profilleri olarak tutabilir
+- ayni response'un score momentum, stagnation, recovery gibi rejimlerde farkli etkisini ayri regime-aware effectiveness profilleri olarak tutabilir
+- response library'yi problem ailesi, mevcut faz ve mevcut rejime gore uzmanlasmis aktif havuza daraltip sonra adaylari o havuzdan skorlayabilir
+- birden fazla uzman response library sinyalini `library_mix_weight` ile karistirip aktif havuzu bu agirlikli karisima gore turetebilir
+- `online_library_weight_profile` ile karisim agirliklarini gecmis performansa gore calisma sirasinda dinamik olarak adapte edebilir
+- `online_exploration_signal` ile explore davranisinin sonuclari gercekten iyi geldikce kesif baskisini ogrenebilir
+- `exploration_quota` ile aktif response library icinde kontrollu bir kesif payi ayirip explore ailesinin tamamen ezilmesini engelleyebilir
 
 Registry tarafinda da artik su tip population operatorleri var:
 
@@ -334,16 +346,22 @@ Sistem artik makine-okunur sekilde sunlari uretebiliyor:
 
 - desteklenen node tipleri
 - desteklenen expression operatorleri
+- expression kategori/palette bilgisi
 - desteklenen reference root'lari
 - operator listesi
+- operator kategori/palette bilgisi
 - operator param semalari
 - mevcut slot schema'ya gore compatible slot listeleri
+- slot group bilgisi
+- baslangic node/template onerileri
 
 Bu sayede gelecekte editor su sorulara backend sormadan cevap bulabilir:
 
 - bu operator hangi parametreleri istiyor
 - bu parametre icin hangi slotlar mantikli
 - bu veri temsili hangi operatorle uyumlu
+- bu expression hangi palette grubunda gosterilmeli
+- editor kullaniciya hangi baslangic node iskeletlerini sunmali
 
 ## Proje Yapisi
 
